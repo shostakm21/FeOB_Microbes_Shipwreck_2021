@@ -1,0 +1,83 @@
+#Field Lab Analysis Programs
+
+## GeoMicroECU Server
+### Data & Resource Managment
+
+- Raw data should be stored in *.zip* format
+- Before starting analysis, check the number of available threads using
+```
+htop
+```
+
+- To check how full disks are, use:
+```
+df -h
+```
+
+## Version Control & Reproducibility
+
+- Keep a record of all commands you run, use:
+```
+history
+```
+
+### Starting on the GeoMicroECU Server
+
+- Log onto the server in terminal:
+```
+ssh geomicroecu@150.216.93.221
+```
+
+- Enter the server password _ ECUM1cr0bes_ and press "y"
+- Enter the correct directory where you will store data
+```
+cd /media/geomicroecu/RAID-1
+```
+
+- Once in RAID, enter you directory using:
+```
+cd shostakm
+```
+
+### Running Programs on the Server
+
+- Before running a code start either
+```screen
+```
+
+or 
+
+```tmux
+```
+
+- To find a specific program that's part of the $PATH use:
+```
+which ProgramName 
+```
+
+- Some programs/scripts will need to be run using the absolute path & can be found:
+```
+ls -lh /home/geomicroecu/scripts/
+```
+
+- When exiting the server, first exit either "screen" or "tmux" & then exit the serving holding down keys:
+```
+ctrl+a+d
+```
+
+- To exit the server use:
+```
+exit
+```
+
+## Mother Analysis
+### Setting Input/Output Directories
+
+- Set input directory
+```
+>set.dir(input=C:/Users/Maggie/Desktop/Mothur.win_64/mothur
+```
+
+- Set output directory
+```
+>set.dir(
