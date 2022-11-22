@@ -1,0 +1,561 @@
+---
+title: "Shipwreck Data Analysis"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-10-25"
+---
+# Shipwreck Data Analysis
+
+Install all the necessary packages:
+```{r}
+library(dada2)
+library(phyloseq)
+library(ggplot2)
+library(ape)
+library(microbiome)
+library(tidyverse)
+library(kableExtra)
+library(phangorn)
+library(DECIPHER)
+library(reshape2)
+library(treeio)
+library(ggtree)
+library(ggstance)
+library(scales)
+library(dplyr)
+library(ggpattern)
+library(vegan)
+library(MASS)
+library(ecodist)
+library(scatterplot3d)
+library(fso)
+library(dplyr)
+```
+
+## Identify Path:
+```{r}
+path <- "/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results"
+```
+```{r}
+list.files(path)
+```
+
+## Forward & Reverse Strands
+```{r}
+fnFs <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
+fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
+```
+
+Extract Sample names:
+```{r}
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
+list(sample.names)
+```
+
+## Inspect Read Quality Scores
+```{r}
+plotQualityProfile(fnFs[1:2])
+plotQualityProfile(fnRs[1:2])
+```
+
+## Filter & Trim
+```{r}
+filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
+filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
+```
+
+```{r}
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE, compress=TRUE, multithread=TRUE)
+head(out)
+```
+
+## Learning Error Rates
+
+```{r}
+errF <- learnErrors(filtFs, multithread=TRUE)
+```
+
+```{r}
+errR <- learnErrors(filtRs, multithread=TRUE)
+```
+
+Plotting Errors:
+```{r}
+plotErrors(errF, nominalQ=TRUE)
+plotErrors(errR, nominalQ=TRUE)
+```
+
+## Dereplication
+Dereplication combines all identical sequencing reads into into “unique sequences” with a corresponding “abundance” equal to the number of reads with that unique sequence. It substantially reduces computation time by eliminating redundant comparisons.
+```{r}
+derepFs <- derepFastq(filtFs, verbose=TRUE)
+derepRs <- derepFastq(filtRs, verbose=TRUE)
+```
+```{r}
+names(derepFs) <- sample.names
+names(derepRs) <- sample.names
+```
+
+## Sample Inference
+```{r}
+dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
+```
+```{r}
+dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
+```
+Inspecting ```dada-class``` object
+```{r}
+dadaFs[[1]]
+dadaRs[[1]]
+```
+
+## Merging Paired Reads
+```{r}
+mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, verbose=TRUE)
+```
+Inspect merger data.fram from 1st sample
+```{r}
+head(mergers[[1]])
+```
+The mergers object is a list of data.frames from each sample. Each data.frame contains the merged $sequence, its $abundance, and the indices of the $forward and $reverse sequence variants that were merged. Paired reads that did not exactly overlap were removed by mergePairs, further reducing spurious output.
+
+## Constructing Sequence Table
+We can now construct an amplicon sequence variant table (ASV) table, a higher-resolution version of the OTU table produced by traditional methods.
+```{r}
+seqtab <- makeSequenceTable(mergers)
+```
+Dimension of the table:
+```{r}
+dim(seqtab)
+```
+Distribution of sequence lengths:
+```{r}
+table(nchar(getSequences(seqtab)))
+```
+The sequence table is a matrix with rows corresponding to (and named by) the samples, and columns corresponding to (and named by) the sequence variants. 
+
+## Removing Chimeras
+```{r}
+seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
+dim(seqtab.nochim)
+```
+```{r}
+sum(seqtab.nochim)/sum(seqtab)
+```
+
+## Tracking Reads Through Pipeline
+```{r}
+getN <- function(x) sum(getUniques(x))
+track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
+colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+rownames(track) <- sample.names
+head(track)
+```
+
+## Assign Taxonomy
+```{r}
+taxa <- assignTaxonomy(seqtab.nochim, "/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/silva_nr99_v138.1_train_set.fa.gz", multithread=TRUE)
+```
+```{r}
+taxa.print <- taxa
+rownames(taxa.print) <- NULL
+head(taxa.print)
+```
+
+# Codys' Code
+Using non chimera sequences in dada2 seqtab object, giving the sequences name as ASV and extracting OTU sequences, abundance and taxonomy
+
+## seq table
+```{r}
+asv_seqs <- colnames(seqtab.nochim)
+asv_headers <- vector(dim(seqtab.nochim)[2], mode="character")
+```
+
+## Fasta header as ASV_
+```{r}
+for (i in 1:dim(seqtab.nochim)[2]) {
+asv_headers[i] <- paste(">ASV", i, sep="_")
+}
+```
+
+## ASV sequences
+```{r}
+asv_fasta <- c(rbind(asv_headers, asv_seqs))
+```
+
+## ASV abundance
+```{r}
+asv_otu <- t(seqtab.nochim)
+row.names(asv_otu) <- sub(">", "", asv_headers)
+```
+
+## ASV taxonomy
+```{r}
+asv_tax <- taxa
+row.names(asv_tax) <- sub(">", "", asv_headers)
+```
+
+## Merging abundance and tax table
+```{r}
+OTU_TAX_table <- merge(asv_otu, asv_tax, by=0)
+```
+
+## Writing for Output Files
+```{r}
+write(asv_fasta, "asv_fasta.fa")
+write.table(asv_otu, "asv_otu.csv", sep=",", quote=F, col.names=NA)
+write.table(asv_tax, "asv_tax.csv", sep=",", quote=F, col.names=NA)
+write.table(OTU_TAX_table, "OTU_TAX_table.csv", sep=",", quote=F, col.names=NA)
+```
+
+Dada2 identifies and classifies "ASV"s, or amplicon sequence variants from your sequenced reads. There can be two different ASVs classified by Dada2, say ASV1 and ASV2 that are both a single species of bacteria but only differ by one single nucleotide in their sequence. A sequence read has to have the same exact sequence to be classified as the same ASV in your dataset. 
+
+OTUs on the other hand are classified based on 97% similarity, so that means 97% of the nucleotides are the same. OTU is the terminology used by mother, qiime, and other classification programs. 
+
+An added bit of confusion is that people still often refer to taxa abundance tables as "OTU tables" even if they are actually ASV tables (you'll see this below where the file you generate is called "OTU_TAX_table" but is actually just an ASV abundance matrix. 
+
+Second point- When I said there are "duplicates" to be combined in your dataset, I meant different ASVs but classified as the same genus/species. So they're not really duplicates because they have slightly different sequences, but for certain analytical purposes they can be combined to determine percent abundance of certain taxa groups. 
+
+So the columns are your samples and the rows are your ASVs. Remember that multiple ASVs can be classified as the same taxa. If you are doing whole community analyses such as NMDS plots or diversity indices, then you don't want to concatenate and consolidate, because you are interested in every single ASV. 
+
+If you are interested in creating taxa plots or % abundance of Thiomicrospirales taxa for example, then you're better off concatenating Kingdom-phylum-etc into one column of taxa IDs, and then consolidating the whole matrix so that you can determine % abundance of each taxa group of interest
+
+### Excel Steps
+1) use concatenate function in excel to combine the 6 taxa classification columns into 1
+2) use consolidate function in excel to combine counts for duplicate taxa names into single counts
+
+# Formating for Stacked Bar Graph
+```{r}
+head(OTU_TAX_Location_table)
+```
+```{r}
+head(asv_otu)
+```
+
+```{r}
+head(asv_tax)
+```
+
+Following Tutorial: https://www.youtube.com/watch?v=NVym44SdcaE
+
+```{r}
+metadata <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/shipwreck_metadata.csv", na="NA") %>%
+  select(Sample_ID, Location) %>%
+  drop_na(Location)
+```
+
+```{r}
+otu_counts <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/t_asv_otu.csv")%>%
+  select(Sample_ID, starts_with("ASV_")) %>%
+  pivot_longer(-Sample_ID, names_to="otu", values_to="count")
+```
+
+```{r}
+taxonomy <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/asv_tax.csv") %>%
+  select("OTU", "Taxonomy") %>%
+  rename_all(tolower) %>%
+  mutate(taxonomy = str_replace_all(taxonomy, "\\(\\d+\\)", ""),
+         taxonomy = str_replace(taxonomy, ";$", "")) %>%
+  separate(taxonomy,
+           into = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus"),
+           sep= ";")
+```
+
+```{r}
+otu_rel_abund <- inner_join(metadata, otu_counts, by = "Sample_ID") %>%
+  inner_join(., taxonomy, by="otu") %>%
+  group_by(Sample_ID) %>%
+  mutate(rel_abund = count / sum(count)) %>%
+  ungroup() %>%
+  select(-count) %>%
+  pivot_longer(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "otu"),
+                 names_to="level", 
+                 values_to="taxon")
+```
+
+```{r}
+head(otu_rel_abund)
+```
+```{r}
+write.csv(otu_rel_abund, "otu_relative_abundance.csv", sep=",", quote=F, col.names=NA)
+```
+
+Filter based on selected Taxonomic Level
+```{r}
+otu_rel_abund %>%
+filter(level=="Phylum") %>%
+group_by(Sample_ID, taxon) %>%
+summarize(rel_abund = sum(rel_abund))
+```
+
+# Stacked Barchart
+```{r}
+otu_rel_abund %>%
+filter(level=="Phylum") %>%
+group_by(Sample_ID, taxon, Location) %>%
+summarize(rel_abund = sum(rel_abund), .groups="drop")%>%
+group_by(taxon, Location) %>%
+summarize(mean_rel_abund = mean(rel_abund), .group="drop") %>%
+ggplot(aes(x=Location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=Location, y=mean_rel_abund), colour="black", stroke=10)
+```
+```{r}
+ggsave("shipwreck_taxon_phylum_stacked_bar.tiff", width=10, height=10)
+```
+
+# Comparing Starboard & Port Side Samples
+
+```{r}
+metadata <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/shipwreck_star_port_metadata.csv", na="NA") %>%
+  select(Sample_ID, Location) %>%
+  drop_na(Location)
+```
+
+```{r}
+otu_counts <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/asv_otu_star_port_only.csv")%>%
+  select(Sample_ID, starts_with("ASV_")) %>%
+  pivot_longer(-Sample_ID, names_to="otu", values_to="count")
+```
+
+```{r}
+taxonomy <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/asv_tax.csv") %>%
+  select("OTU", "Taxonomy") %>%
+  rename_all(tolower) %>%
+  mutate(taxonomy = str_replace_all(taxonomy, "\\(\\d+\\)", ""),
+         taxonomy = str_replace(taxonomy, ";$", "")) %>%
+  separate(taxonomy,
+           into = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus"),
+           sep= ";")
+```
+
+```{r}
+otu_rel_abund <- inner_join(metadata, otu_counts, by = "Sample_ID") %>%
+  inner_join(., taxonomy, by="otu") %>%
+  group_by(Sample_ID) %>%
+  mutate(rel_abund = count / sum(count)) %>%
+  ungroup() %>%
+  select(-count) %>%
+  pivot_longer(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "otu"),
+                 names_to="level", 
+                 values_to="taxon")
+```
+
+```{r}
+head(otu_rel_abund)
+```
+
+```{r}
+write.csv(otu_rel_abund, "otu_relative_abundance_star_port_only.csv", sep=",", quote=F, col.names=NA)
+```
+
+Filter based on selected Taxonomic Level
+```{r}
+otu_rel_abund %>%
+filter(level=="Phylum") %>%
+group_by(Sample_ID, taxon) %>%
+summarize(rel_abund = sum(rel_abund))
+```
+
+# Stacked Barchart of Starboard & Port Side Phylum Samples Only:
+```{r}
+otu_rel_abund %>%
+filter(level=="Phylum") %>%
+group_by(Sample_ID, taxon, Location) %>%
+summarize(rel_abund = sum(rel_abund), .groups="drop")%>%
+group_by(taxon, Location) %>%
+summarize(mean_rel_abund = mean(rel_abund), .group="drop") %>%
+ggplot(aes(x=Location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=Location, y=mean_rel_abund), colour="black", stroke=10)
+```
+
+```{r}
+ggsave("shipwreck_taxon_phylum_stacked_bar_star_port_only.tiff", width=10, height=10)
+```
+
+# Stacked Barchart of Starboard & Port Side Class Samples Only:
+```{r}
+otu_rel_abund %>%
+filter(level=="Class") %>%
+group_by(Sample_ID, taxon, Location) %>%
+summarize(rel_abund = sum(rel_abund), .groups="drop")%>%
+group_by(taxon, Location) %>%
+summarize(mean_rel_abund = mean(rel_abund), .group="drop") %>%
+ggplot(aes(x=Location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=Location, y=mean_rel_abund), colour="black", stroke=10)
+```
+```{r}
+ggsave("shipwreck_taxon_class_stacked_bar_star_port_only.tiff", width=10, height=15)
+```
+
+# Comparing Sample Locations w/o Chloroplast:
+```{r}
+metadata <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/shipwreck_metadata.csv", na="NA") %>%
+  select(Sample_ID, Location) %>%
+  drop_na(Location)
+```
+
+```{r}
+otu_counts <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/t_asv_otu.csv")%>%
+  select(Sample_ID, starts_with("ASV_")) %>%
+  pivot_longer(-Sample_ID, names_to="otu", values_to="count")
+```
+
+```{r}
+taxonomy <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/ASV_Tax_No_Chloro.csv") %>%
+  select("OTU", "Taxonomy") %>%
+  rename_all(tolower) %>%
+  mutate(taxonomy = str_replace_all(taxonomy, "\\(\\d+\\)", ""),
+         taxonomy = str_replace(taxonomy, ";$", "")) %>%
+  separate(taxonomy,
+           into = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus"),
+           sep= ";")
+```
+
+```{r}
+otu_rel_abund_no_cyano <- inner_join(metadata, otu_counts, by = "Sample_ID") %>%
+  inner_join(., taxonomy, by="otu") %>%
+  group_by(Sample_ID) %>%
+  mutate(rel_abund = count / sum(count)) %>%
+  ungroup() %>%
+  select(-count) %>%
+  pivot_longer(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "otu"),
+                 names_to="level", 
+                 values_to="taxon")
+```
+
+```{r}
+head(otu_rel_abund_no_cyano)
+```
+
+```{r}
+write.csv(otu_rel_abund_no_cyano, "otu_relative_abundance_no_cyano.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+otu_rel_abund_no_cyano %>%
+filter(level=="Phylum") %>%
+group_by(Sample_ID, taxon) %>%
+summarize(rel_abund = sum(rel_abund))
+```
+
+```{r}
+otu_rel_abund_no_cyano %>%
+filter(level=="Phylum") %>%
+group_by(Sample_ID, taxon, Location) %>%
+summarize(rel_abund = sum(rel_abund), .groups="drop")%>%
+group_by(taxon, Location) %>%
+summarize(mean_rel_abund = mean(rel_abund), .group="drop") %>%
+ggplot(aes(x=Location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=Location, y=mean_rel_abund), colour="black", stroke=12)
+```
+
+```{r}
+ggsave("shipwreck_taxon_phylum_stacked_bar_no_cyano.tiff", width=10, height=10)
+```
+
+# NMDS
+```{r}
+abund_table <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/otu_table_nmds.csv", check.names=FALSE)
+abund_table
+```
+
+```{r}
+meta_table <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/shipwreck_metadata_no_chlorop.csv",check.names=FALSE)
+meta_table
+```
+```{r}
+meta_table <- meta_table[rownames(abund_table),]
+```
+
+```{r}
+grouping_info <- data.frame(row.names=rownames(abund_table),t(as.data.frame(strsplit(rownames(abund_table),"_"))))
+grouping_info
+```
+
+```{r}
+sol<-metaMDS(abund_table,distance = "bray", k = 2, trymax = 50)
+```
+
+```{r}
+NMDS
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Brewer Assistance
+Code doesn't really work
+
+```{r}
+#matrix_for_nmds <- read.csv("/Users/maggieshostak/Desktop/Sequencing_Data/IMR_Results/Shipwreck_Data_Analysis/matrix_for_nmds.csv", header=T)
+
+#pc = matrix_for_nmds
+ 
+#com = pc[,3:ncol(pc)]
+#com2 <- as.data.frame(drop_na(com))
+#typeof(com2)
+#m_com <- as.matrix(com2)
+#set.seed(123)
+#nmds = metaMDS(m_com, distance = "bray")
+#nmds <- princomp(m_com)
+#biplot(nmds)
+```
+
+```{r}
+#pc_nmds <- t(cbind(matrix_for_nmds[3:ncol(pc)]))
+#colnames(pc_nmds) <- pc[,2]
+```
+
+```{r}
+#pc_nmds
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
