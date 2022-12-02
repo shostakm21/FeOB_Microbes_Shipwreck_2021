@@ -1,0 +1,261 @@
+---
+title: "FeOB Data Analysis"
+author: "Maggie Shostak"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Load all necessary packages:
+```{r}
+library(dada2)
+library(phyloseq)
+library(ggplot2)
+library(ape)
+library(microbiome)
+library(tidyverse)
+library(kableExtra)
+library(phangorn)
+library(DECIPHER)
+library(reshape2)
+library(treeio)
+library(ggtree)
+library(ggstance)
+library(scales)
+library(dplyr)
+library(ggpattern)
+library(vegan)
+library(MASS)
+library(ecodist)
+library(scatterplot3d)
+library(fso)
+library(dplyr)
+library(svglite)
+library(ggstatsplot)
+```
+
+# dada2 fastq file analysis
+1) Identify path of files
+```{r}
+path <- "/Users/maggieshostak/Desktop/Shipwreck/data/fastq_files"
+list.files(path)
+```
+
+2) Forward & Reverse Strands
+```{r}
+fnFs <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
+fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
+```
+
+3) Extract sample names
+```{r}
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
+list(sample.names)
+```
+
+4) Inspect read quality scores
+```{r}
+plotQualityProfile(fnFs[1:2])
+plotQualityProfile(fnRs[1:2])
+```
+
+5) Filter & trim
+```{r}
+filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
+filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
+
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE, compress=TRUE, multithread=TRUE)
+head(out)
+```
+
+6) Learning & Plotting Error rates
+```{r}
+errF <- learnErrors(filtFs, multithread=TRUE)
+errR <- learnErrors(filtRs, multithread=TRUE)
+plotErrors(errF, nominalQ=TRUE)
+plotErrors(errR, nominalQ=TRUE)
+```
+
+7) Dereplication
+This combines all identical sequencing reads into into “unique sequences” with a corresponding “abundance” equal to the number of reads with that unique sequence. It substantially reduces computation time by eliminating redundant comparisons.
+```{r}
+derepFs <- derepFastq(filtFs, verbose=TRUE)
+derepRs <- derepFastq(filtRs, verbose=TRUE)
+
+names(derepFs) <- sample.names
+names(derepRs) <- sample.names
+```
+
+8) Sample inference
+```{r}
+dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
+
+dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
+
+dadaFs[[1]]
+dadaRs[[1]]
+```
+
+9) Merging paird reads
+The mergers object is a list of data.frames from each sample. Each data.frame contains the merged sequence, its abundance, and the indices of the forward and reverse sequence variants that were merged. Paired reads that did not exactly overlap were removed by mergePairs, further reducing spurious output.
+```{r}
+mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, verbose=TRUE)
+head(mergers[[1]])
+```
+
+
+10) Sequence table construction
+We can now construct an amplicon sequence variant table (ASV) table, a higher-resolution version of the OTU table produced by traditional methods. The sequence table is a matrix with rows corresponding to (and named by) the samples, and columns corresponding to (and named by) the sequence variants. 
+```{r}
+seqtab <- makeSequenceTable(mergers)
+
+dim(seqtab)
+
+table(nchar(getSequences(seqtab)))
+```
+
+11) Removing chimeras
+```{r}
+seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
+dim(seqtab.nochim)
+
+sum(seqtab.nochim)/sum(seqtab)
+```
+
+12) Tracking reads through the pipeline
+```{r}
+getN <- function(x) sum(getUniques(x))
+track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
+colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+rownames(track) <- sample.names
+head(track)
+```
+
+13) Assigning taxonomy
+```{r}
+taxa <- assignTaxonomy(seqtab.nochim, "/Users/maggieshostak/Desktop/Shipwreck/data/fastq_files/silva_nr99_v138.1_train_set.fa.gz", multithread=TRUE)
+
+taxa.print <- taxa
+rownames(taxa.print) <- NULL
+head(taxa.print)
+```
+
+
+# Formatting files for further analysis
+
+```{r}
+asv_seqs <- colnames(seqtab.nochim)
+asv_headers <- vector(dim(seqtab.nochim)[2], mode="character")
+
+for (i in 1:dim(seqtab.nochim)[2]) {
+asv_headers[i] <- paste(">ASV", i, sep="_")
+}
+
+asv_fasta <- c(rbind(asv_headers, asv_seqs))
+
+asv_otu <- t(seqtab.nochim)
+row.names(asv_otu) <- sub(">", "", asv_headers)
+
+asv_tax <- taxa
+row.names(asv_tax) <- sub(">", "", asv_headers)
+
+otu_tax_table <- merge(asv_otu, asv_tax, by=0)
+```
+
+Write output files:
+```{r}
+write(asv_fasta, "asv_fasta.fa")
+write.table(asv_otu, "asv_otu.csv", sep=",", quote=F, col.names=NA)
+write.table(asv_tax, "asv_tax.csv", sep=",", quote=F, col.names=NA)
+write.table(otu_tax_table, "otu_tax_table.csv", sep=",", quote=F, col.names=NA)
+```
+
+# Formating files to join data.frames
+
+```{r}
+metadata
+```
+
+```{r}
+metadata %>% count(location)
+```
+
+```{r}
+metadata %>% count(depth)
+```
+
+```{r}
+metadata %>% count(water_level)
+```
+
+```{r}
+otu_counts <- read_csv("/Users/maggieshostak/Desktop/Shipwreck/data/asv_otu_no_chloroplast.csv") %>%
+  pivot_longer(-sample_id, names_to="ASV", values_to = "count")
+otu_counts
+```
+
+```{r}
+taxonomy <- asv_tax_no_chloroplast
+taxonomy
+```
+
+
+```{r}
+metadata
+```
+
+```{r}
+otu_counts
+```
+
+```{r}
+taxonomy
+```
+
+```{r}
+otu_rel_abund <- inner_join(metadata, otu_counts) %>%
+  inner_join(., taxonomy, by="ASV") %>%
+  group_by(sample_id) %>%
+  mutate(rel_abund = count / sum(count)) %>%
+  ungroup() %>%
+  pivot_longer(cols=c("Kingdom", "Phylum", "Class", "Order", "Genus", "ASV"),
+         names_to="level",
+         values_to="taxon"
+  )
+otu_rel_abund
+```
+
+# Stacked Barcharts
+
+```{r}
+otu_rel_abund %>%
+  filter(level=="Phylum") %>%
+  group_by(sample_id, location, taxon) %>%
+  summarize(rel_abund = sum(rel_abund)) %>%
+  group_by(location, taxon) %>%
+  summarize(mean_rel_abund = 100*mean(rel_abund)) %>%
+  ggplot(aes(x=location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=location, y=mean_rel_abund), colour="black", stroke=10) +
+    labs(x=NULL, 
+         y="Mean Relative Abundance (%)") +
+    theme_classic()
+```
+
+```{r}
+ggsave("phylum_stacked_bar.tiff", width=10, height=7)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
