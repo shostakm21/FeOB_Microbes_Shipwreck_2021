@@ -222,6 +222,7 @@ otu_rel_abund <- inner_join(metadata, otu_counts) %>%
          values_to="taxon"
   )
 otu_rel_abund
+write.table(otu_rel_abund, "otu_rel_abund.csv", sep=",", quote=F, col.names=NA)
 ```
 
 # Stacked Barcharts
@@ -244,13 +245,138 @@ otu_rel_abund %>%
 ggsave("phylum_stacked_bar.tiff", width=10, height=7)
 ```
 
+# NMDS Location
 
+```{r}
+pc = read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/metadata_asv.csv")
+pc
+```
 
+```{r}
+com = pc[,5:ncol(pc)]
+com
+m_com <- as.matrix(com)
+m_com
+```
 
+```{r}
+set.seed(100)
+nmds = metaMDS(m_com, distance = "bray")
+```
 
+```{r}
+data.scores <- as.data.frame(scores(nmds)$sites)
+data.scores$location = pc$location
+data.scores$sample_id = pc$sample_id
+head(data.scores)
+```
+ 
+```{r}
+xx = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 5, aes(shape = location, colour = location))+
+ theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "location", y = "NMDS2") +
+ scale_colour_manual(values = c("#7CB342", "#039BE5", "#EC407A", "Black", "#E53935", "#212121", "#FF9900", "#FFCC99", "Orange"))
+xx
+```
 
+```{r}
+ggsave("Shipwreck_NMDS.tiff")
+```
 
+# NMDS Depth
+```{r}
+data.scores2 <- as.data.frame(scores(nmds)$sites)
+data.scores2$depth = pc$depth
+data.scores2$sample_id = pc$sample_id
+head(data.scores2)
+```
 
+```{r}
+xx = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 5, aes(depth = depth, fill=factor(depth))) +
+  scale_fill_discrete()
+ theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "Depth", y = "NMDS2")
+xx
+```
+
+# NMDS Waterlevel
+```{r}
+data.scores3 <- as.data.frame(scores(nmds)$sites)
+data.scores3$water_level = pc$water_level
+data.scores3$sample_id = pc$sample_id
+head(data.scores3)
+```
+
+```{r}
+xx = ggplot(data.scores3, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 5, aes(shape = water_level, colour = water_level))+
+ theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "water_level", y = "NMDS2")
+xx
+```
+
+# Diversity Index Value Generating
+```{r}
+otu_table <- read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/asv_otu_no_chloroplast.csv", header=T, row.names=1, check.names=FALSE)
+```
+
+Transpose the data to have sample names on rows
+```{r}
+otu_table <-t(otu_table)
+data(otu_table)
+H<-diversity(otu_table)
+simp<-diversity(otu_table, "simpson")
+invsimp<-diversity(otu_table, "inv")
+```
+
+Unbiased Simpson (Hurlbert 1971, eq. 5) with rarefy:
+```{r}
+unbias.simp <- rarefy(otu_table, 2) - 1
+```
+
+Fisher alpha
+```{r}
+alpha <- fisher.alpha(otu_table)
+```
+
+Species richness (S) and Pielou's evenness (J):
+```{r}
+S <- specnumber(otu_table)
+J <- H/log(S)
+```
+
+Plot all
+```{r}
+pairs(cbind(H, simp, invsimp, unbias.simp, alpha), pch="+", col="red")
+alpha
+```
+
+```{r}
+write.table(J, "/Users/maggieshostak/desktop/pielou_evenness_no_chlorop.txt", sep="\t")
+```
 
 
 
