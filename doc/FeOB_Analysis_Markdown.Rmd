@@ -95,13 +95,12 @@ dadaFs[[1]]
 dadaRs[[1]]
 ```
 
-9) Merging paird reads
+9) Merging paired reads
 The mergers object is a list of data.frames from each sample. Each data.frame contains the merged sequence, its abundance, and the indices of the forward and reverse sequence variants that were merged. Paired reads that did not exactly overlap were removed by mergePairs, further reducing spurious output.
 ```{r}
 mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, verbose=TRUE)
 head(mergers[[1]])
 ```
-
 
 10) Sequence table construction
 We can now construct an amplicon sequence variant table (ASV) table, a higher-resolution version of the OTU table produced by traditional methods. The sequence table is a matrix with rows corresponding to (and named by) the samples, and columns corresponding to (and named by) the sequence variants. 
@@ -138,7 +137,6 @@ taxa.print <- taxa
 rownames(taxa.print) <- NULL
 head(taxa.print)
 ```
-
 
 # Formatting files for further analysis
 
@@ -198,7 +196,6 @@ taxonomy <- asv_tax_no_chloroplast
 taxonomy
 ```
 
-
 ```{r}
 metadata
 ```
@@ -245,6 +242,53 @@ otu_rel_abund %>%
 ggsave("phylum_stacked_bar.tiff", width=10, height=7)
 ```
 
+## Starboard vs Port Side
+
+```{r}
+otu_rel_abund_star_port %>%
+  filter(level=="Phylum") %>%
+  group_by(sample_id, location, taxon) %>%
+  summarize(rel_abund = sum(rel_abund)) %>%
+  group_by(location, taxon) %>%
+  summarize(mean_rel_abund = 100*mean(rel_abund)) %>%
+  ggplot(aes(x=location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=location, y=mean_rel_abund), colour="black", stroke=10) +
+    labs(x=NULL, 
+         y="Mean Relative Abundance (%)") +
+    theme_classic()
+```
+
+```{r}
+ggsave("StarPort_stacked_bar.tiff", width=10, height=7)
+```
+
+## Sediment Comparison
+
+```{r}
+otu_rel_abund_sed <- otu_rel_abund %>% 
+  filter(location == "Sediment")
+
+#write.csv(otu_rel_abund_sed, "otu_rel_abund_sed.csv")
+```
+
+```{r}
+otu_rel_abund_sed %>%
+  filter(level=="Phylum") %>%
+  group_by(sample_id, location, taxon) %>%
+  summarize(rel_abund = sum(rel_abund)) %>%
+  group_by(location, taxon) %>%
+  summarize(mean_rel_abund = 100*mean(rel_abund)) %>%
+  ggplot(aes(x=location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=location, y=mean_rel_abund), colour="black", stroke=10) +
+    labs(x=NULL, 
+         y="Mean Relative Abundance (%)") +
+    theme_classic()
+```
+
+```{r}
+ggsave("Sediment_stacked_bar.tiff", width=10, height=7)
+```
+
 # NMDS Location
 
 ```{r}
@@ -270,7 +314,7 @@ data.scores$location = pc$location
 data.scores$sample_id = pc$sample_id
 head(data.scores)
 ```
- 
+Make NMDS Plot
 ```{r}
 xx = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
  geom_point(size = 5, aes(shape = location, colour = location))+
@@ -301,7 +345,7 @@ head(data.scores2)
 
 ```{r}
 xx = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 5, aes(depth = depth, fill=factor(depth))) +
+ geom_point(size = 5, aes(depth = depth, shape=factor(depth), colour=factor(depth))) +
   scale_fill_discrete()
  theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
        axis.text.x = element_text(colour = "black", face = "bold", size = 12),
@@ -313,6 +357,10 @@ xx = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
        legend.key=element_blank()) +
  labs(x = "NMDS1", colour = "Depth", y = "NMDS2")
 xx
+```
+
+```{r}
+ggsave("Shipwreck_NMDS_depth.tiff")
 ```
 
 # NMDS Waterlevel
@@ -338,6 +386,10 @@ xx = ggplot(data.scores3, aes(x = NMDS1, y = NMDS2)) +
 xx
 ```
 
+```{r}
+ggsave("Shipwreck_NMDS_water_level.tiff")
+```
+
 # Diversity Index Value Generating
 ```{r}
 otu_table <- read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/asv_otu_no_chloroplast.csv", header=T, row.names=1, check.names=FALSE)
@@ -345,26 +397,26 @@ otu_table <- read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/asv_otu_no_ch
 
 Transpose the data to have sample names on rows
 ```{r}
-otu_table <-t(otu_table)
-data(otu_table)
-H<-diversity(otu_table)
-simp<-diversity(otu_table, "simpson")
-invsimp<-diversity(otu_table, "inv")
+t_otu_table <-t(otu_table)
+data(t_otu_table)
+H<-diversity(t_otu_table)
+simp<-diversity(t_otu_table, "simpson")
+invsimp<-diversity(t_otu_table, "inv")
 ```
 
 Unbiased Simpson (Hurlbert 1971, eq. 5) with rarefy:
 ```{r}
-unbias.simp <- rarefy(otu_table, 2) - 1
+unbias.simp <- rarefy(t_otu_table, 2) - 1
 ```
 
 Fisher alpha
 ```{r}
-alpha <- fisher.alpha(otu_table)
+alpha <- fisher.alpha(t_otu_table)
 ```
 
 Species richness (S) and Pielou's evenness (J):
 ```{r}
-S <- specnumber(otu_table)
+S <- specnumber(t_otu_table)
 J <- H/log(S)
 ```
 
@@ -375,9 +427,38 @@ alpha
 ```
 
 ```{r}
-write.table(J, "/Users/maggieshostak/desktop/pielou_evenness_no_chlorop.txt", sep="\t")
+write.table(J, "/Users/maggieshostak/desktop/pielou_evenness.txt", sep="\t")
 ```
 
+# ANOSIM Test
+
+```{r}
+pc = read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/metadata_asv.csv", header= TRUE)
+```
+
+```{r}
+#make community matrix - extract columns with abundance information, turn data frame into matrix
+com = pc[,5:ncol(pc)]
+m_com = as.matrix(com)
+```
+
+```{r}
+ano = anosim(m_com, pc$location, distance = "bray", permutations = 9999)
+ano
+```
+
+Results: 
+  ANOSIM statistic R: 0.2599 
+  Significance: 1e-04 
+  Permutation: Free
+When interpreting these results you want to look at the ANOSIM statistic R and the Significance values. A Significance value less than 0.05 is generally considered to be statistically significant, and means the null hypothesis can be rejected. Therefore, there is a statistically significant difference in the microbial communities between your groups. Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.
+
+“The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups” (GUSTAME). In other words, the higher the R value, the more dissimilar your groups are in terms of microbial community composition.
+
+# SIMPER TEST
+```{r}
+
+```
 
 
 
