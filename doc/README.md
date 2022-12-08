@@ -1,5 +1,5 @@
 
-# FeOB Data Analysis Using dada2 Pipeline in RStudio
+# FeOB Data Analysis Using RStudio
 
 Load all necessary packages:
 ```{r}
