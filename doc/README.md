@@ -188,7 +188,7 @@ otu_counts
 ```
 
 ```{r}
-taxonomy <- asv_tax_no_chloroplast
+taxonomy <- read.csv(">file_path<")
 taxonomy
 ```
 
