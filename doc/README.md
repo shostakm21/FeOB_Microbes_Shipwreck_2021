@@ -1,9 +1,5 @@
----
-title: "FeOB Data Analysis"
-author: "Maggie Shostak"
-date: "`r Sys.Date()`"
-output: html_document
----
+
+# FeOB Data Analysis Using dada2 Pipeline in RStudio
 
 Load all necessary packages:
 ```{r}
@@ -454,15 +450,3 @@ Results:
 When interpreting these results you want to look at the ANOSIM statistic R and the Significance values. A Significance value less than 0.05 is generally considered to be statistically significant, and means the null hypothesis can be rejected. Therefore, there is a statistically significant difference in the microbial communities between your groups. Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.
 
 “The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups” (GUSTAME). In other words, the higher the R value, the more dissimilar your groups are in terms of microbial community composition.
-
-# SIMPER TEST
-```{r}
-
-```
-
-
-
-
-
-
-
