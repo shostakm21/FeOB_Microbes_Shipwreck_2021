@@ -472,32 +472,32 @@ Call:
 anosim(x = m_comB, grouping = pc$location, permutations = 9999,      distance = "bray") 
 Dissimilarity: bray 
 
-*ANOSIM statistic R: 0.3495 
+ANOSIM statistic R: 0.3495 
       Significance: 1e-04 
 Permutation: free
-Number of permutations: 9999*
+Number of permutations: 9999
 
 
 Call:
 anosim(x = m_comB, grouping = pc$water_level, permutations = 9999,      distance = "bray") 
 Dissimilarity: bray 
 
-*ANOSIM statistic R: 0.4067 
+ANOSIM statistic R: 0.4067 
       Significance: 1e-04 
 Permutation: free
-Number of permutations: 9999*
+Number of permutations: 9999
 
 
 Call:
 anosim(x = m_comB, grouping = pc$depth, permutations = 9999,      distance = "bray") 
 Dissimilarity: bray 
 
-*ANOSIM statistic R: 0.4701 
+ANOSIM statistic R: 0.4701 
       Significance: 1e-04 
 Permutation: free
-Number of permutations: 9999*
----
+Number of permutations: 9999
+
 When interpreting these results you want to look at the ANOSIM statistic R and the Significance values. A Significance value less than 0.05 is generally considered to be statistically significant, and means the null hypothesis can be rejected. Therefore, there is a statistically significant difference in the microbial communities between your groups. Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.
 
 “The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups” (GUSTAME). In other words, the higher the R value, the more dissimilar your groups are in terms of microbial community composition.
----
+
