@@ -24,3 +24,5 @@ Contributors:
 - Dr. Nathan Richards (Maritime Archeology Department, ECU)
 - Dr. Ariane Peralta (Biology Department, ECU)
 - Dr. April Blakeslee (Biology Department, ECU)
+
+For more information about research projects view the Field Laboratory website [http://www.efieldlab.com]
