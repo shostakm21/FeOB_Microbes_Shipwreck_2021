@@ -181,45 +181,46 @@ metadata %>% count(depth)
 metadata %>% count(water_level)
 ```
 
+# Formating files to join data.frames
+Split *_asv_otu file_* into 2 separate dataframe to manually transpose in excel, then merged: 
 ```{r}
-otu_counts <- read_csv("/Users/maggieshostak/Desktop/Shipwreck/data/asv_otu_no_chloroplast.csv") %>%
-  pivot_longer(-sample_id, names_to="ASV", values_to = "count")
-otu_counts
+df1 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df_1.csv")
+df1
+
+df2 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df_2.csv")
+df2
+
+df_list <- list(df1, df2)
+otu_count <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list) %>%
+  pivot_longer(-sample_id, names_to = "ASV", values_to = "count")
+otu_count
 ```
 
+Check column headers for joining data.frames:
 ```{r}
-taxonomy <- read.csv(">file_path<")
 taxonomy
-```
-
-```{r}
 metadata
+otu_count
 ```
 
-```{r}
-otu_counts
-```
+# Generate an OTU Relative Abundance Table:
+This will be used for NMDS plots & statistical testing
 
 ```{r}
-taxonomy
-```
-
-```{r}
-otu_rel_abund <- inner_join(metadata, otu_counts) %>%
+otu_rel_abund <- inner_join(metadata, otu_count, by="sample_id") %>%
   inner_join(., taxonomy, by="ASV") %>%
   group_by(sample_id) %>%
   mutate(rel_abund = count / sum(count)) %>%
   ungroup() %>%
   pivot_longer(cols=c("Kingdom", "Phylum", "Class", "Order", "Genus", "ASV"),
          names_to="level",
-         values_to="taxon"
-  )
+         values_to="taxon")
 otu_rel_abund
 write.table(otu_rel_abund, "otu_rel_abund.csv", sep=",", quote=F, col.names=NA)
 ```
 
-# Stacked Barcharts
-
+# Stacked Barcharts: All Samples
+Using stacked barcharts will allow us to visualize differences in microbial communities for each of the sample locations. A great first step to compare samples!
 ```{r}
 otu_rel_abund %>%
   filter(level=="Phylum") %>%
@@ -232,17 +233,15 @@ otu_rel_abund %>%
     labs(x=NULL, 
          y="Mean Relative Abundance (%)") +
     theme_classic()
+ggsave("phylum_stacked_bar.tiff", width=15, height=7)
 ```
 
-```{r}
-ggsave("phylum_stacked_bar.tiff", width=10, height=7)
-```
+## Starboard vs Port Side Samples
 
-## Starboard vs Port Side
-
+### Starboard:
 ```{r}
-otu_rel_abund_star_port %>%
-  filter(level=="Phylum") %>%
+otu_rel_abund %>%
+  filter(level=="Phylum", location == "Starboard") %>%
   group_by(sample_id, location, taxon) %>%
   summarize(rel_abund = sum(rel_abund)) %>%
   group_by(location, taxon) %>%
@@ -252,19 +251,31 @@ otu_rel_abund_star_port %>%
     labs(x=NULL, 
          y="Mean Relative Abundance (%)") +
     theme_classic()
+ggsave("Starboard_stacked_bar.tiff", width=5, height=7)
 ```
 
+### Port:
 ```{r}
-ggsave("StarPort_stacked_bar.tiff", width=10, height=7)
+otu_rel_abund %>%
+  filter(level=="Phylum", location == "Port") %>%
+  group_by(sample_id, location, taxon) %>%
+  summarize(rel_abund = sum(rel_abund)) %>%
+  group_by(location, taxon) %>%
+  summarize(mean_rel_abund = 100*mean(rel_abund)) %>%
+  ggplot(aes(x=location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=location, y=mean_rel_abund), colour="black", stroke=10) +
+    labs(x=NULL, 
+         y="Mean Relative Abundance (%)") +
+    theme_classic()
+ggsave("Port_stacked_bar.tiff", width=5, height=7)
 ```
 
-## Sediment Comparison
-
+### Sediment Sample Comparison
 ```{r}
 otu_rel_abund_sed <- otu_rel_abund %>% 
   filter(location == "Sediment")
 
-#write.csv(otu_rel_abund_sed, "otu_rel_abund_sed.csv")
+write.csv(otu_rel_abund_sed, "otu_rel_abund_sed.csv")
 ```
 
 ```{r}
@@ -279,13 +290,11 @@ otu_rel_abund_sed %>%
     labs(x=NULL, 
          y="Mean Relative Abundance (%)") +
     theme_classic()
-```
-
-```{r}
 ggsave("Sediment_stacked_bar.tiff", width=10, height=7)
 ```
 
-# NMDS Location
+# NMDS Plots: Location
+A way to condense information from multidimensional data (multiple variables/species/ASVs), into a 2D representation or ordination. The closer 2 points are, the more similar the corresponding samples are with respect to the variables that went into making the NMDS plot.
 
 ```{r}
 pc = read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/metadata_asv.csv")
@@ -310,7 +319,8 @@ data.scores$location = pc$location
 data.scores$sample_id = pc$sample_id
 head(data.scores)
 ```
-Make NMDS Plot
+
+Make NMDS Plot:
 ```{r}
 xx = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
  geom_point(size = 5, aes(shape = location, colour = location))+
@@ -444,9 +454,3 @@ ano
 ```
 
 Results: 
-  ANOSIM statistic R: 0.2599 
-  Significance: 1e-04 
-  Permutation: Free
-When interpreting these results you want to look at the ANOSIM statistic R and the Significance values. A Significance value less than 0.05 is generally considered to be statistically significant, and means the null hypothesis can be rejected. Therefore, there is a statistically significant difference in the microbial communities between your groups. Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.
-
-“The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups” (GUSTAME). In other words, the higher the R value, the more dissimilar your groups are in terms of microbial community composition.
