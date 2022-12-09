@@ -236,7 +236,7 @@ otu_rel_abund %>%
 ggsave("phylum_stacked_bar.tiff", width=15, height=7)
 ```
 
-## Starboard vs Port Side Samples
+## Starboard & Port Sample Comparison
 
 ### Starboard:
 ```{r}
@@ -270,7 +270,7 @@ otu_rel_abund %>%
 ggsave("Port_stacked_bar.tiff", width=5, height=7)
 ```
 
-### Sediment Sample Comparison
+## Sediment Sample Comparison
 ```{r}
 otu_rel_abund_sed <- otu_rel_abund %>% 
   filter(location == "Sediment")
