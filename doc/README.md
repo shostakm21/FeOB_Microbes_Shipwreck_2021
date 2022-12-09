@@ -293,26 +293,43 @@ otu_rel_abund_sed %>%
 ggsave("Sediment_stacked_bar.tiff", width=10, height=7)
 ```
 
-# NMDS Plots: Location
+# NMDS Plots
 A way to condense information from multidimensional data (multiple variables/species/ASVs), into a 2D representation or ordination. The closer 2 points are, the more similar the corresponding samples are with respect to the variables that went into making the NMDS plot.
 
 ```{r}
-pc = read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/metadata_asv.csv")
+pc <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu.csv")
 pc
 ```
 
+You want to make a data frame that only includes your species/OTU abundance columns
 ```{r}
-com = pc[,5:ncol(pc)]
+com = pc[,7:ncol(pc)]
 com
-m_com <- as.matrix(com)
-m_com
 ```
 
+Often in R you will get errors because your data is not in the right format. Right now our data is in the “data frame” format, but it needs to be in the “matrix” format for use in the vegan package. The following code is how to convert it
+```{r}
+m_com <- as.matrix(com)
+#m_com
+```
+
+Now we can run the metaMDS command from the vegan package to generate an NMDS plot. 
+
+Calling your nmds object in R, will give you some information about your analysis. An important number to note is the stress, which is roughly the “goodness of fit” of your NMDS ordination. For a good representation of your data, the stress value should ideally be less than 0.2. If the stress value is 0, it might mean you have an outlier sample that is very different than all your other samples.
 ```{r}
 set.seed(100)
 nmds = metaMDS(m_com, distance = "bray")
 ```
 
+You can easily plot a simple NMDS in base R:
+```{r}
+plot(nmds)
+```
+
+To make a nicer plot, use the ggplot2 package.
+First you need to obtain the coordinates for your NMDS1 and NMDS2 axes and put them in a new data frame: I’ve called this new data frame, “data.scores”
+
+Next, you can add columns from your original data (pc) to your new NMDS coordinates data frame. This will come in handy when you plot your data and want to differentiate groups or treatments:
 ```{r}
 data.scores <- as.data.frame(scores(nmds)$sites)
 data.scores$location = pc$location
@@ -320,11 +337,11 @@ data.scores$sample_id = pc$sample_id
 head(data.scores)
 ```
 
-Make NMDS Plot:
+Make NMDS Plot using ggplot2:
 ```{r}
 xx = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 5, aes(shape = location, colour = location))+
- theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
+ geom_point(size = 2, aes(colour = location))+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
        axis.text.x = element_text(colour = "black", face = "bold", size = 12),
        legend.text = element_text(size = 12, face ="bold", colour ="black"),
        legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
@@ -332,16 +349,12 @@ xx = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
        legend.title = element_text(size = 14, colour = "black", face = "bold"),
        panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
        legend.key=element_blank()) +
- labs(x = "NMDS1", colour = "location", y = "NMDS2") +
- scale_colour_manual(values = c("#7CB342", "#039BE5", "#EC407A", "Black", "#E53935", "#212121", "#FF9900", "#FFCC99", "Orange"))
+ labs(x = "NMDS1", colour = "location", y = "NMDS2")
 xx
+#ggsave("Shipwreck_NMDS_all.tiff")
 ```
 
-```{r}
-ggsave("Shipwreck_NMDS.tiff")
-```
-
-# NMDS Depth
+## NMDS Depth
 ```{r}
 data.scores2 <- as.data.frame(scores(nmds)$sites)
 data.scores2$depth = pc$depth
@@ -350,8 +363,8 @@ head(data.scores2)
 ```
 
 ```{r}
-xx = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 5, aes(depth = depth, shape=factor(depth), colour=factor(depth))) +
+xx2 = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 2, aes(depth = depth, colour=factor(depth))) +
   scale_fill_discrete()
  theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
        axis.text.x = element_text(colour = "black", face = "bold", size = 12),
@@ -362,14 +375,12 @@ xx = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
        panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
        legend.key=element_blank()) +
  labs(x = "NMDS1", colour = "Depth", y = "NMDS2")
-xx
+xx2
+#ggsave("Shipwreck_NMDS_depth.tiff")
 ```
 
-```{r}
-ggsave("Shipwreck_NMDS_depth.tiff")
-```
 
-# NMDS Waterlevel
+## NMDS Waterlevel
 ```{r}
 data.scores3 <- as.data.frame(scores(nmds)$sites)
 data.scores3$water_level = pc$water_level
@@ -378,8 +389,8 @@ head(data.scores3)
 ```
 
 ```{r}
-xx = ggplot(data.scores3, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 5, aes(shape = water_level, colour = water_level))+
+xx3 = ggplot(data.scores3, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 2, aes(colour = water_level))+
  theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
        axis.text.x = element_text(colour = "black", face = "bold", size = 12),
        legend.text = element_text(size = 12, face ="bold", colour ="black"),
@@ -389,16 +400,13 @@ xx = ggplot(data.scores3, aes(x = NMDS1, y = NMDS2)) +
        panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
        legend.key=element_blank()) +
  labs(x = "NMDS1", colour = "water_level", y = "NMDS2")
-xx
-```
-
-```{r}
-ggsave("Shipwreck_NMDS_water_level.tiff")
+xx3
+#ggsave("Shipwreck_NMDS_waterlevel.tiff")
 ```
 
 # Diversity Index Value Generating
 ```{r}
-otu_table <- read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/asv_otu_no_chloroplast.csv", header=T, row.names=1, check.names=FALSE)
+otu_table <- read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/nmds_asv_otu.csv", header=T, row.names=1, check.names=FALSE)
 ```
 
 Transpose the data to have sample names on rows
@@ -442,15 +450,54 @@ write.table(J, "/Users/maggieshostak/desktop/pielou_evenness.txt", sep="\t")
 pc = read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/metadata_asv.csv", header= TRUE)
 ```
 
+Make community matrix - extract columns with abundance information, turn data frame into matrix
 ```{r}
-#make community matrix - extract columns with abundance information, turn data frame into matrix
-com = pc[,5:ncol(pc)]
-m_com = as.matrix(com)
+comB = pc[,7:ncol(pc)]
+m_comB = as.matrix(comB)
 ```
 
 ```{r}
-ano = anosim(m_com, pc$location, distance = "bray", permutations = 9999)
+ano = anosim(m_comB, pc$location, distance = "bray", permutations = 9999)
 ano
+
+ano2 = anosim(m_comB, pc$water_level, distance = "bray", permutations = 9999)
+ano2
+
+ano3 = anosim(m_comB, pc$depth, distance = "bray", permutations = 9999)
+ano3
 ```
 
-Results: 
+## Results
+Call:
+anosim(x = m_comB, grouping = pc$location, permutations = 9999,      distance = "bray") 
+Dissimilarity: bray 
+
+*ANOSIM statistic R: 0.3495 
+      Significance: 1e-04 
+Permutation: free
+Number of permutations: 9999*
+
+
+Call:
+anosim(x = m_comB, grouping = pc$water_level, permutations = 9999,      distance = "bray") 
+Dissimilarity: bray 
+
+*ANOSIM statistic R: 0.4067 
+      Significance: 1e-04 
+Permutation: free
+Number of permutations: 9999*
+
+
+Call:
+anosim(x = m_comB, grouping = pc$depth, permutations = 9999,      distance = "bray") 
+Dissimilarity: bray 
+
+*ANOSIM statistic R: 0.4701 
+      Significance: 1e-04 
+Permutation: free
+Number of permutations: 9999*
+---
+When interpreting these results you want to look at the ANOSIM statistic R and the Significance values. A Significance value less than 0.05 is generally considered to be statistically significant, and means the null hypothesis can be rejected. Therefore, there is a statistically significant difference in the microbial communities between your groups. Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.
+
+“The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups” (GUSTAME). In other words, the higher the R value, the more dissimilar your groups are in terms of microbial community composition.
+---
