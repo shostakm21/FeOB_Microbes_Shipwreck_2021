@@ -190,7 +190,9 @@ df1
 df2 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df_2.csv")
 df2
 
-df_list <- list(df1, df2)
+df_list <- merge(df1, df2)
+df_list
+
 otu_count <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list) %>%
   pivot_longer(-sample_id, names_to = "ASV", values_to = "count")
 otu_count
