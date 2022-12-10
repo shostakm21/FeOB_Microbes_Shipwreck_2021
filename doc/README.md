@@ -186,16 +186,16 @@ Split *_asv_otu file_* into 2 separate dataframe to manually transpose in excel,
 ```{r}
 df1 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df_1.csv")
 df1
-
 df2 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df_2.csv")
 df2
-
 df_list <- merge(df1, df2)
 df_list
 
 otu_count <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list) %>%
   pivot_longer(-sample_id, names_to = "ASV", values_to = "count")
 otu_count
+
+write.table(nmds_asv_otu, "nmds_asv_otu.csv", sep=",", quote=F, col.names=NA)
 ```
 
 Check column headers for joining data.frames:
