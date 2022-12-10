@@ -3,6 +3,7 @@
 ## GeoMicroECU Server
 ### Data & Resource Managment
 
+- You must be using the Cisco AnyConnect VPN before you can access the server
 - Raw data should be stored in *.zip* format
 - Before starting analysis, check the number of available threads using
 ```
