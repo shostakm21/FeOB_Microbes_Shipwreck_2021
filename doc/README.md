@@ -73,10 +73,15 @@ Remember though, when choosing truncLen for paired-end reads you must maintain o
 
 The maxEE=c(8,8) setting is saying that there can be a max of 8 ambiguous nucleotides in a row for each forward and reverse read before the read is tossed out.
 
+FWD & REV are the sequences for the universal primers (V4-V5) listed on IMRs website.
+
 ```{r}
+FWD <- "GTGYCAGCMGCCGCGGTAA"
+REV <- "CCGYCAATTYMTTTRAGTTT"
+trimLeft = c(FWD, REV)
 filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
 filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
-out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, maxN=0, maxEE=c(8,8), truncLen=c(280,200), truncQ=2, rm.phix=TRUE, compress=TRUE, multithread=TRUE)
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen = c(280,200), maxN = 0, maxEE = c(2,2), truncQ = 2, rm.phix = TRUE, compress = TRUE, multithread = TRUE, trimLeft = c(19,20))
 head(out)
 ```
 
