@@ -91,8 +91,8 @@ Points are the observed error rates for each consensus quality score. The black 
 errF <- learnErrors(filtFs, multithread=TRUE)
 errR <- learnErrors(filtRs, multithread=TRUE)
 ```
-101871560 total bases in 363827 reads from 20 samples will be used for learning the error rates.
-103005600 total bases in 515028 reads from 29 samples will be used for learning the error rates.
+104655519 total bases in 400979 reads from 24 samples will be used for learning the error rates.
+101224800 total bases in 562360 reads from 35 samples will be used for learning the error rates.
 
 Visualize Errors
 ```{r}
@@ -138,6 +138,8 @@ seqtab <- makeSequenceTable(mergers)
 dim(seqtab)
 table(nchar(getSequences(seqtab)))
 ```
+ 89 15239
+0.9192429
 
 11) Removing chimeras
 The core dada method corrects substitution and indel errors, but chimeras remain. Fortunately, the accuracy of the sequence variants after denoising makes identifying chimeras simpler than it is when dealing with fuzzy OTUs. Chimeric sequences are identified if they can be exactly reconstructed by combining a left-segment and a right-segment from two more abundant “parent” sequences.
