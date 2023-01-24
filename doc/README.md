@@ -112,13 +112,16 @@ names(derepRs) <- sample.names
 8) Sample inference
 ```{r}
 dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
-dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
 dadaFs[[1]]
-dadaRs[[1]]
 ```
 dada-class: object describing DADA2 denoising results
 266 sequence variants were inferred from 6305 input unique sequences.
 Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
+
+```{r}
+dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
+dadaRs[[1]]
+```
 
 dada-class: object describing DADA2 denoising results
 185 sequence variants were inferred from 7633 input unique sequences.
