@@ -163,7 +163,9 @@ dim(seqtab.nochim)
 sum(seqtab.nochim)/sum(seqtab)
 ```
 ```{r}
-
+Identified 31390 bimeras out of 46629 input sequences.
+  89 15239
+  0.9192429
 ```
 
 12) Tracking reads through the pipeline
