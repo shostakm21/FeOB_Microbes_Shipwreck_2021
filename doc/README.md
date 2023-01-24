@@ -114,20 +114,24 @@ names(derepRs) <- sample.names
 dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
 dadaFs[[1]]
 ```
+```{r}
 dada-class: object describing DADA2 denoising results
 319 sequence variants were inferred from 4141 
 input unique sequences.
 Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 
 16
+```
 
 ```{r}
 dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
 dadaRs[[1]]
 ```
 
+```{r}
 dada-class: object describing DADA2 denoising results
 245 sequence variants were inferred from 4096 input unique sequences.
 Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
+```
 
 9) Merging paired reads
 The mergers object is a list of data.frames from each sample. Each data.frame contains the merged sequence, its abundance, and the indices of the forward and reverse sequence variants that were merged. Paired reads that did not exactly overlap were removed by mergePairs, further reducing spurious output.
@@ -143,15 +147,23 @@ seqtab <- makeSequenceTable(mergers)
 dim(seqtab)
 table(nchar(getSequences(seqtab)))
 ```
- 89 15239
-0.9192429
+```{r}
+[1]    89 46629
+
+  451 
+46629 
+```
 
 11) Removing chimeras
 The core dada method corrects substitution and indel errors, but chimeras remain. Fortunately, the accuracy of the sequence variants after denoising makes identifying chimeras simpler than it is when dealing with fuzzy OTUs. Chimeric sequences are identified if they can be exactly reconstructed by combining a left-segment and a right-segment from two more abundant “parent” sequences.
+
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 sum(seqtab.nochim)/sum(seqtab)
+```
+```{r}
+
 ```
 
 12) Tracking reads through the pipeline
