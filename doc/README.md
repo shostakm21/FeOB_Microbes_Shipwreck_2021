@@ -186,8 +186,7 @@ rownames(taxa.print) <- NULL
 head(taxa.print)
 ```
 
-# Formatting files for further analysis
-These files will be easier to work with for different statistical testing, plotting and other uses further down in analysis
+# Formatting Files for Further Analysis
 ```{r}
 asv_seqs <- colnames(seqtab.nochim)
 asv_headers <- vector(dim(seqtab.nochim)[2], mode="character")
@@ -204,8 +203,8 @@ asv_fasta <- c(rbind(asv_headers, asv_seqs))
 ```
 
 ```{r}
-asv_otu <- as.data.frame(seqtab.nochim)
-row.names(asv_otu) <- sub(">", "", asv_headers)
+asv_otu <- t(seqtab.nochim)
+row.names(asv_otu) <- sub(">","", asv_headers)
 ```
 
 ```{r}
@@ -217,12 +216,12 @@ row.names(asv_tax) <- sub(">", "", asv_headers)
 otu_tax_table <- merge(asv_otu, asv_tax, by=0)
 ```
 
-Write output files:
+## Output Files:
 ```{r}
-write(asv_fasta, "asv_fasta.fa")
-write.table(asv_otu, "asv_otu.csv", sep=",", quote=F, col.names=NA)
-write.table(asv_tax, "asv_tax.csv", sep=",", quote=F, col.names=NA)
-write.table(otu_tax_table, "OTU_TAX_table.csv", sep=",", quote=F, col.names=NA)
+write(asv_fasta, "asv_fasta_adjusted.fa")
+write.table(asv_otu, "asv_otu_adjusted.csv", sep=",", quote=F, col.names=NA)
+write.table(asv_tax, "asv_tax_adjusted.csv", sep=",", quote=F, col.names=NA)
+write.table(otu_tax_table, "OTU_TAX_table_adjusted.csv", sep=",", quote=F, col.names=NA)
 ```
 
 ## Checking counts for different variables:
