@@ -252,7 +252,6 @@ otu_count <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list) %>%
 otu_count
 
 write.table(otu_count, "otu_count.csv", sep=",", quote=F, col.names=NA)
-write.table(nmds_asv_otu, "nmds_asv_otu.csv", sep=",", quote=F, col.names=NA)
 ```
 
 ```{r}
