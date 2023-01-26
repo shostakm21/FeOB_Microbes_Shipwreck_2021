@@ -598,3 +598,8 @@ When interpreting these results you want to look at the ANOSIM statistic "R" & t
   - A Significance value >0.05, means that there is no statistical difference between the microbial communities in your groups.
 
 The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high & low ranks within & between groups. In other words, the higher the R value, the more dissimilar your groups are in terms of microbial community composition!
+
+# Distance Matrix & PCA
+```{r}
+
+```
