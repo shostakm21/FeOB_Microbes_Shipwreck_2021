@@ -793,11 +793,11 @@ plot_ordination(ps.prop, ord.nmds.bray, color="Depth", title="Bray NMDS")
 ```
 
 # Statistical Analysis: ANOSIM, ANOVA, SIMPER
-## ANOSIM Statistical Testing
-### Location Biofilm
+# ANOSIM Statistical Testing
+## Location Specific Biofilm & Water
 Make community matrix - extract columns with abundance information, turn data frame into matrix
 ```{r}
-pcL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Location_Biofilm.csv")
+pcL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/Anosim_Sed_S_P_RDP_BK_AFST_W.csv")
 pcL
 
 comL = pcL[,3:ncol(pcL)]
@@ -805,12 +805,14 @@ comL
 
 m_comL = as.matrix(comL)
 m_comL
+```
 
+```{r}
 anoL = anosim(m_comL, pcL$location, distance = "bray", permutations = 9999)
 anoL
 ```
 
-### Depth Biofilm
+## Depth Biofilm
 ```{r}
 pcD <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Depth_Biofilm.csv")
 pcD
@@ -820,14 +822,16 @@ comD
 
 m_comD = as.matrix(comD)
 m_comD
+```
 
+```{r}
 anoD = anosim(m_comD, pcD$depth, distance = "bray", permutations = 9999)
 anoD
 ```
 
-### Water-level Biofilm
+## Water-level Biofilm
 ```{r}
-pcWL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Waterlevel_Biofilm.csv")
+pcWL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/Anosim_Waterlevel_Biofilm.csv")
 pcWL
 
 comWL = pcWL[,3:ncol(pcWL)]
@@ -835,12 +839,49 @@ comWL
 
 m_comWL = as.matrix(comWL)
 m_comWL
+```
 
+```{r}
 anoWL = anosim(m_comWL, pcWL$water_level, distance = "bray", permutations = 9999)
 anoWL
 ```
 
-## Starboard vs Port
+## Testing significance between microenvironments
+### Shipwreck_Biofilm, Sediment_Biofilm and Water_Samples
+```{r}
+pcSSW <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/Anosim_Ship_Sed_Water.csv")
+pcSSW
+
+comSSW = pcSSW[,3:ncol(pcSSW)]
+comSSW
+
+m_comSSW = as.matrix(comSSW)
+m_comSSW
+```
+
+```{r}
+anoSSW <- anosim(m_comSSW, pcSSW$location, distance = "bray", permutations = 9999)
+anoSSW
+```
+
+### Shipwreck_biofilm (Starboard & Port), Sediment_biofilm, Bulkhead_biofilm, Rudder Post_biofilm, Aft_Starboard_biofilm, Water_sample
+```{r}
+pcSSBRAW <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/Anosim_Ship_Sed_Water_Bulk_Aft_Rud.csv")
+pcSSBRAW
+
+comSSBRAW = pcSSBRAW[,3:ncol(pcSSBRAW)]
+comSSBRAW
+
+m_comSSBRAW = as.matrix(comSSBRAW)
+m_comSSBRAW
+```
+
+```{r}
+anoSSBRAW <- anosim(m_comSSBRAW, pcSSBRAW$location, distance = "bray", permutations = 9999)
+anoSSBRAW
+```
+
+## Testing significance between Starboard side & Port side
 ### SP Location Biofilm
 ```{r}
 pcSPL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Location_SP_Biofilm.csv")
@@ -851,7 +892,9 @@ comSPL
 
 m_comSPL = as.matrix(comSPL)
 m_comSPL
+```
 
+```{r}
 anoSPL = anosim(m_comSPL, pcSPL$location, distance = "bray", permutations = 9999)
 anoSPL
 ```
@@ -866,7 +909,9 @@ comSPD
 
 m_comSPD = as.matrix(comSPD)
 m_comSPD
+```
 
+```{r}
 anoSPD = anosim(m_comSPD, pcSPD$depth, distance = "bray", permutations = 9999)
 anoSPD
 ```
@@ -881,16 +926,20 @@ comSPWL
 
 m_comSPWL = as.matrix(comSPWL)
 m_comSPWL
+```
 
+```{r}
 anoSPWL = anosim(m_comSPWL, pcSPWL$water_level, distance = "bray", permutations = 9999)
 anoSPWL
 ```
 
 When interpreting these results you want to look at the ANOSIM statistic R and the Significance values. 
 
-“The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups” (GUSTAME). In other words, *the higher the R value, the more dissimilar your groups are in terms of microbial community composition!*
+“The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. 
 
-A *Significance value less than 0.05 is generally considered to be statistically significant*, and means the null hypothesis can be rejected. Therefore, *there is a statistically significant difference in the microbial communities between your groups*. *Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.*
+**An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups”** (GUSTAME). In other words, the **higher the R value, the more dissimilar your groups are in terms of microbial community composition!**
+
+**A Significance value less than 0.05 is generally considered to be statistically significant**, and means the null hypothesis can be rejected. Therefore, there is a **statistically significant difference in the microbial communities between your groups.** **Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.**
 
 # Diversity Index Value Generating
 ## Biofilm & Water Samples
