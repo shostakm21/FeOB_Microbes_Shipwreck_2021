@@ -738,12 +738,6 @@ taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
 ps
 ```
 
-phyloseq-class experiment-level object
-otu_table()   OTU Table:         [ 15239 taxa and 89 samples ]
-sample_data() Sample Data:       [ 89 samples by 3 sample variables ]
-tax_table()   Taxonomy Table:    [ 15239 taxa by 6 taxonomic ranks ]
-refseq()      DNAStringSet:      [ 15239 reference sequences ]
-
 ```{r}
 plot_richness(ps, x="Depth", measures=c("Shannon", "Simpson"), color="Waterlevel")
 ```
