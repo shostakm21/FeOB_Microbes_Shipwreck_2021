@@ -1,6 +1,6 @@
 # FeOB Data Anlysis Using RStudio
 
-## Load all necessary packages:
+Load all necessary packages:
 ```{r}
 library(dada2)
 library(phyloseq)
@@ -26,16 +26,32 @@ library(fso)
 library(dplyr)
 library(svglite)
 library(ggstatsplot)
-library(skimr)
-library(kableExtra)
-library(data.table)
-library(taxa)
+library(grid)
+library(labdsv)
+library(indicspecies)
+library(viridis)
+library(ggplot2)
+library('cowplot')
 ```
 
-## dada2 fastq file analysis
+# P-value Formatter
+```{r}
+formatPvalues <- function(pvalue) {
+  ra<- ""
+  if(pvalue <= 0.1) ra<- "."
+  if(pvalue <= 0.05) ra<- "*"
+  if(pvalue <= 0.01) ra<- "**"
+  if(pvalue <= 0.001) ra<- "***"
+  return(ra)
+}
+```
+
+# Dada2 Pipeline
+Fastq file analysis
+
 1) Identify path of files
 ```{r}
-path <- "/Users/maggieshostak/Desktop/Shipwreck/data/fastq_files"
+path <- "/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/fastq_files"
 list.files(path)
 ```
 
@@ -57,8 +73,7 @@ Now we visualize the quality profile of the reverse reads.
 
 In gray-scale is a heat map of the frequency of each quality score at each base position. The median quality score at each position is shown by the green line, and the quartiles of the quality score distribution by the orange lines. The red line shows the scaled proportion of reads that extend to at least that position (this is more useful for other sequencing technologies, as Illumina reads are typically all the same lenghth, hence the flat red line).
 
-The forward reads are good quality. We generally advise trimming the last few nucleotides to avoid less well-controlled errors that can arise there. These quality profiles do not suggest that any additional trimming is needed. 
-
+The forward reads are good quality. We generally advise trimming the last few nucleotides to avoid less well-controlled errors that can arise there. These quality profiles do not suggest that any additional trimming is needed. We will truncate the forward reads at position 240 (trimming the last 10 nucleotides).
 ```{r}
 plotQualityProfile(fnFs[1:2])
 plotQualityProfile(fnRs[1:2])
@@ -72,8 +87,6 @@ If you want to speed up downstream computation, consider tightening maxEE. If to
 Remember though, when choosing truncLen for paired-end reads you must maintain overlap after truncation in order to merge them later.
 
 The maxEE=c(8,8) setting is saying that there can be a max of 8 ambiguous nucleotides in a row for each forward and reverse read before the read is tossed out.
-
-FWD & REV are the sequences for the universal primers (V4-V5) listed on IMRs website.
 
 ```{r}
 FWD <- "GTGYCAGCMGCCGCGGTAA"
@@ -114,24 +127,19 @@ names(derepRs) <- sample.names
 dadaFs <- dada(derepFs, err=errF, multithread=TRUE)
 dadaFs[[1]]
 ```
-```{r}
 dada-class: object describing DADA2 denoising results
 319 sequence variants were inferred from 4141 
 input unique sequences.
-Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 
-16
-```
+Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
 
 ```{r}
 dadaRs <- dada(derepRs, err=errR, multithread=TRUE)
 dadaRs[[1]]
 ```
-
-```{r}
 dada-class: object describing DADA2 denoising results
-245 sequence variants were inferred from 4096 input unique sequences.
+245 sequence variants were inferred from 4096 
+input unique sequences.
 Key parameters: OMEGA_A = 1e-40, OMEGA_C = 1e-40, BAND_SIZE = 16
-```
 
 9) Merging paired reads
 The mergers object is a list of data.frames from each sample. Each data.frame contains the merged sequence, its abundance, and the indices of the forward and reverse sequence variants that were merged. Paired reads that did not exactly overlap were removed by mergePairs, further reducing spurious output.
@@ -147,26 +155,17 @@ seqtab <- makeSequenceTable(mergers)
 dim(seqtab)
 table(nchar(getSequences(seqtab)))
 ```
-```{r}
-[1]    89 46629
-
-  451 
-46629 
-```
 
 11) Removing chimeras
 The core dada method corrects substitution and indel errors, but chimeras remain. Fortunately, the accuracy of the sequence variants after denoising makes identifying chimeras simpler than it is when dealing with fuzzy OTUs. Chimeric sequences are identified if they can be exactly reconstructed by combining a left-segment and a right-segment from two more abundant “parent” sequences.
-
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 sum(seqtab.nochim)/sum(seqtab)
 ```
-```{r}
 Identified 31390 bimeras out of 46629 input sequences.
-  89 15239
-  0.9192429
-```
+[1]    89 15239
+[1] 0.9192429
 
 12) Tracking reads through the pipeline
 ```{r}
@@ -180,91 +179,79 @@ head(track)
 13) Assigning taxonomy
 It is common at this point, especially in 16S/18S/ITS amplicon sequencing, to assign taxonomy to the sequence variants. 
 ```{r}
-taxa <- assignTaxonomy(seqtab.nochim, "/Users/maggieshostak/Desktop/Shipwreck/data/fastq_files/silva_nr99_v138.1_train_set.fa.gz", multithread=TRUE)
+taxa <- assignTaxonomy(seqtab.nochim, "/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/silva_nr99_v138.1_train_set.fa.gz", multithread=TRUE)
 taxa.print <- taxa
 rownames(taxa.print) <- NULL
 head(taxa.print)
 ```
-
-# Formatting Files for Further Analysis
+# Formatting files for further analysis
+These files will be easier to work with for different statistical testing, plotting and other uses further down in analysis
+d
+## Seq Table
 ```{r}
 asv_seqs <- colnames(seqtab.nochim)
 asv_headers <- vector(dim(seqtab.nochim)[2], mode="character")
 ```
 
+## Fasta Header as ASV_
 ```{r}
 for (i in 1:dim(seqtab.nochim)[2]) {
 asv_headers[i] <- paste(">ASV", i, sep="_")
 }
 ```
 
+## ASV Sequences
 ```{r}
 asv_fasta <- c(rbind(asv_headers, asv_seqs))
 ```
 
+## ASV Abundance
 ```{r}
 asv_otu <- t(seqtab.nochim)
-row.names(asv_otu) <- sub(">","", asv_headers)
+row.names(asv_otu) <- sub(">", "", asv_headers)
 ```
 
+## ASV Taxonomy
 ```{r}
 asv_tax <- taxa
 row.names(asv_tax) <- sub(">", "", asv_headers)
 ```
 
+## Merging Abundance and Tax Table
 ```{r}
 otu_tax_table <- merge(asv_otu, asv_tax, by=0)
 ```
 
-## Output Files:
+## Write output files:
 ```{r}
 write(asv_fasta, "asv_fasta_adjusted.fa")
 write.table(asv_otu, "asv_otu_adjusted.csv", sep=",", quote=F, col.names=NA)
 write.table(asv_tax, "asv_tax_adjusted.csv", sep=",", quote=F, col.names=NA)
-write.table(otu_tax_table, "OTU_TAX_table_adjusted.csv", sep=",", quote=F, col.names=NA)
+write.table(otu_tax_table, "otu_tax_table_adjusted.csv", sep=",", quote=F, col.names=NA)
 ```
 
-## Checking counts for different variables:
+# Formating files to join data.frames
 ```{r}
-metadata %>% count(location)
+metadata_bio_water <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/metadata_bio_water.csv")
+metadata_bio_water
 ```
 
+# Generate a OTU Count File:
 ```{r}
-metadata %>% count(depth)
-```
-
-```{r}
-metadata %>% count(water_level)
-```
-
-## Formating files to join data.frames
-
-```{r}
-df1 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df_1.csv")
-df1
-df2 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df_2.csv")
-df2
-df_list <- list(df1, df2)
-df_list
-
-otu_count <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list) %>%
-  pivot_longer(-sample_id, names_to = "ASV", values_to = "count")
-otu_count
-
-write.table(otu_count, "otu_count.csv", sep=",", quote=F, col.names=NA)
+otu_counts <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/asv_otu.csv") %>%
+  pivot_longer(-ASV, names_to="sample_id", values_to = "count")
+otu_counts
 ```
 
 ```{r}
+taxonomy <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/asv_tax.csv")
 taxonomy
-metadata
-otu_count
 ```
 
-
-## Generate an OTU Relative Abundance Table:
+# Generate an OTU Relative Abundance Table:
 This will be used for NMDS plots & statistical testing
 ```{r}
-otu_rel_abund <- inner_join(metadata, otu_count, by="sample_id") %>%
+otu_rel_abund_bio_water <- inner_join(metadata_bio_water, otu_counts, by="sample_id") %>%
   inner_join(., taxonomy, by="ASV") %>%
   group_by(sample_id) %>%
   mutate(rel_abund = count / sum(count)) %>%
@@ -272,14 +259,24 @@ otu_rel_abund <- inner_join(metadata, otu_count, by="sample_id") %>%
   pivot_longer(cols=c("Kingdom", "Phylum", "Class", "Order", "Genus", "ASV"),
          names_to="level",
          values_to="taxon")
-otu_rel_abund
-write.table(otu_rel_abund, "otu_rel_abund.csv", sep=",", quote=F, col.names=NA)
+otu_rel_abund_bio_water
 ```
 
-## Stacked Barcharts: All Samples
+```{r}
+write.table(otu_rel_abund_bio_water, "otu_rel_abund_adjusted_biofilm_water.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+otu_rel_abund_bio_water <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/otu_rel_abund_adjusted_biofilm_water.csv")
+```
+
+# Determining Taxonomic Abundances & Community Composition
+## Stacked Barcharts
 Using stacked barcharts will allow us to visualize differences in microbial communities for each of the sample locations. A great first step to compare samples!
+
+### Stacked Barcharts: All Samples
 ```{r}
-otu_rel_abund %>%
+otu_rel_abund_bio_water %>%
   filter(level=="Phylum") %>%
   group_by(sample_id, location, taxon) %>%
   summarize(rel_abund = sum(rel_abund)) %>%
@@ -290,17 +287,29 @@ otu_rel_abund %>%
     labs(x=NULL, 
          y="Mean Relative Abundance (%)") +
     theme_classic()
-ggsave("phylum_stacked_bar.tiff", width=15, height=7)
+ggsave("phylum_stacked_bar_adjusted_water_biofilm.tiff", width=20, height=7)
 ```
 
-### Sediment Sample Comparison
+### Stacked Barcharts: Biofilms Samples Only
 ```{r}
-otu_rel_abund_sed <- otu_rel_abund %>% 
-  filter(location == "Sediment")
+metadata_bio <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/metadata_biofilm.csv")
+metadata_bio
+```
 
-write.csv(otu_rel_abund_sed, "otu_rel_abund_sed.csv")
+```{r}
+otu_rel_abund_bio <- inner_join(metadata_bio, otu_counts, by="sample_id") %>%
+  inner_join(., taxonomy, by="ASV") %>%
+  group_by(sample_id) %>%
+  mutate(rel_abund = count / sum(count)) %>%
+  ungroup() %>%
+  pivot_longer(cols=c("Kingdom", "Phylum", "Class", "Order", "Genus", "ASV"),
+         names_to="level",
+         values_to="taxon")
+otu_rel_abund_bio
+```
 
-otu_rel_abund_sed %>%
+```{r}
+otu_rel_abund_bio %>%
   filter(level=="Phylum") %>%
   group_by(sample_id, location, taxon) %>%
   summarize(rel_abund = sum(rel_abund)) %>%
@@ -311,58 +320,122 @@ otu_rel_abund_sed %>%
     labs(x=NULL, 
          y="Mean Relative Abundance (%)") +
     theme_classic()
-ggsave("Sediment_stacked_bar.tiff", width=10, height=7)
+```
+
+```{r}
+ggsave("phylum_stacked_bar_adjusted_biofilm.tiff", width=15, height=7)
+```
+
+### Stacked Barcharts: Water Samples Only
+```{r}
+metadata_water <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/metadata_water.csv")
+metadata_water
+```
+
+```{r}
+otu_rel_abund_water <- inner_join(metadata_water, otu_counts, by="sample_id") %>%
+  inner_join(., taxonomy, by="ASV") %>%
+  group_by(sample_id) %>%
+  mutate(rel_abund = count / sum(count)) %>%
+  ungroup() %>%
+  pivot_longer(cols=c("Kingdom", "Phylum", "Class", "Order", "Genus", "ASV"),
+         names_to="level",
+         values_to="taxon")
+otu_rel_abund_water
+```
+
+```{r}
+otu_rel_abund_water %>%
+  filter(level=="Phylum") %>%
+  group_by(sample_id, location, taxon) %>%
+  summarize(rel_abund = sum(rel_abund)) %>%
+  group_by(location, taxon) %>%
+  summarize(mean_rel_abund = 100*mean(rel_abund)) %>%
+  ggplot(aes(x=location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=location, y=mean_rel_abund), colour="black", stroke=10) +
+    labs(x=NULL, 
+         y="Mean Relative Abundance (%)") +
+    theme_classic()
+```
+
+```{r}
+ggsave("phylum_stacked_bar_adjusted_water.tiff", width=12, height=7)
+```
+
+### Stacked Barcharts: Starboard vs Port Side
+```{r}
+metadata_star_port <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/metadata_star_port_only.csv")
+metadata_star_port
+```
+
+```{r}
+otu_rel_abund_SP <- inner_join(metadata_star_port, otu_counts, by="sample_id") %>%
+  inner_join(., taxonomy, by="ASV") %>%
+  group_by(sample_id) %>%
+  mutate(rel_abund = count / sum(count)) %>%
+  ungroup() %>%
+  pivot_longer(cols=c("Kingdom", "Phylum", "Class", "Order", "Genus", "ASV"),
+         names_to="level",
+         values_to="taxon")
+otu_rel_abund_SP
+```
+
+```{r}
+write.table(otu_rel_abund_SP, "otu_rel_abund_adjusted_SP.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+otu_rel_abund_SP %>%
+  filter(level=="Phylum") %>%
+  group_by(sample_id, location, taxon) %>%
+  summarize(rel_abund = sum(rel_abund)) %>%
+  group_by(location, taxon) %>%
+  summarize(mean_rel_abund = 100*mean(rel_abund)) %>%
+  ggplot(aes(x=location, y=mean_rel_abund, fill=taxon)) +
+  geom_col(aes(x=location, y=mean_rel_abund), colour="black", stroke=10) +
+    labs(x=NULL, 
+         y="Mean Relative Abundance (%)") +
+    theme_classic()
+```
+
+```{r}
+ggsave("phylum_stacked_bar_adjusted_SP.tiff", width=10, height=8)
 ```
 
 ## NMDS Plots
 A way to condense information from multidimensional data (multiple variables/species/ASVs), into a 2D representation or ordination. The closer 2 points are, the more similar the corresponding samples are with respect to the variables that went into making the NMDS plot.
 
+### NMDS: Location
 ```{r}
-pc <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu.csv")
+pc = read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu_biofilm_all_water_together.csv")
 pc
 ```
 
-You want to make a data frame that only includes your species/OTU abundance columns
 ```{r}
-com = pc[,7:ncol(pc)]
+com = pc[,6:ncol(pc)]
 com
-```
-
-Often in R you will get errors because your data is not in the right format. Right now our data is in the “data frame” format, but it needs to be in the “matrix” format for use in the vegan package. The following code is how to convert it
-```{r}
 m_com <- as.matrix(com)
 m_com
 ```
 
-Now we can run the metaMDS command from the vegan package to generate an NMDS plot. 
-
-Calling your nmds object in R, will give you some information about your analysis. An important number to note is the stress, which is roughly the “goodness of fit” of your NMDS ordination. For a good representation of your data, the stress value should ideally be less than 0.2. If the stress value is 0, it might mean you have an outlier sample that is very different than all your other samples.
 ```{r}
-set.seed(100)
+set.seed(1000)
 nmds = metaMDS(m_com, distance = "bray")
 ```
 
-You can easily plot a simple NMDS in base R:
-```{r}
-plot(nmds)
-```
-
-To make a nicer plot, use the ggplot2 package.
-First you need to obtain the coordinates for your NMDS1 and NMDS2 axes and put them in a new data frame: I’ve called this new data frame, “data.scores”
-
-Next, you can add columns from your original data (pc) to your new NMDS coordinates data frame. This will come in handy when you plot your data and want to differentiate groups or treatments:
 ```{r}
 data.scores <- as.data.frame(scores(nmds)$sites)
 data.scores$location = pc$location
 data.scores$sample_id = pc$sample_id
 head(data.scores)
-write.table(data.scores, "nmds_data.scores_all_samples.csv", sep=",", quote=F, col.names=NA)
 ```
 
-Make NMDS Plot using ggplot2:
+Make NMDS Plot
 ```{r}
 xx = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 2, aes(colour = location))+
+ geom_point(size = 3, aes(colour = location))+
+  scale_fill_discrete()+
+  ggtitle("NMDS Ordination - Sample Location")+
  theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
        axis.text.x = element_text(colour = "black", face = "bold", size = 12),
        legend.text = element_text(size = 12, face ="bold", colour ="black"),
@@ -373,22 +446,65 @@ xx = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
        legend.key=element_blank()) +
  labs(x = "NMDS1", colour = "location", y = "NMDS2")
 xx
-ggsave("Shipwreck_NMDS_all.tiff")
+ggsave("Shipwreck_NMDS_location_adjusted_bio_water.tiff")
+```
+
+### Water All Combined vs Biofilm
+```{r}
+pcBW <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu_biofilm_all_water_together.csv")
+
+comBW = pcBW[,6:ncol(pcBW)]
+m_comBW <- as.matrix(comBW)
+
+set.seed(1000)
+nmdsBW = metaMDS(m_comBW, distance = "bray")
+
+data.scores.BW <- as.data.frame(scores(nmdsBW)$sites)
+data.scores.BW$location = pcBW$location
+data.scores.BW$sample_id = pcBW$sample_id
+head(data.scores.BW)
+```
+
+```{r}
+xxBW = ggplot(data.scores.BW, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(colour = location))+
+  scale_fill_discrete()+
+  ggtitle("NMDS Ordination - Sample Location")+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "location", y = "NMDS2")
+xxBW
+
+ggsave("Shipwreck_NMDS_location_adjusted_biofilm_water.tiff")
 ```
 
 ### NMDS Depth
 ```{r}
-data.scores2 <- as.data.frame(scores(nmds)$sites)
-data.scores2$depth = pc$depth
-data.scores2$sample_id = pc$sample_id
-head(data.scores2)
-write.table(data.scores2, "nmds_data.scores_all_depth.csv", sep=",", quote=F, col.names=NA)
+data.scores.BW2 <- as.data.frame(scores(nmdsBW)$sites)
+data.scores.BW2$depth = pcBW$depth
+data.scores.BW2$sample_id = pcBW$sample_id
+head(data.scores.BW2)
 ```
 
 ```{r}
-xx2 = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 2, aes(depth = depth, colour=factor(depth))) +
-  scale_fill_discrete()
+data.scores.BW2 <- as.data.frame(scores(nmdsBW)$sites)
+data.scores.BW2$depth = pcBW$depth
+data.scores.BW2$sample_id = pcBW$sample_id
+head(data.scores.BW2)
+write.table(data.scores.BW2, "nmds_data.scores_all_depth_bio_water.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+xxBW2 = ggplot(data.scores.BW2, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(depth = depth, colour=factor(depth))) +
+  scale_fill_discrete()+
+  ggtitle("NMDS Ordination - Sample Depth") +
  theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
        axis.text.x = element_text(colour = "black", face = "bold", size = 12),
        legend.text = element_text(size = 12, face ="bold", colour ="black"),
@@ -397,105 +513,28 @@ xx2 = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
        legend.title = element_text(size = 14, colour = "black", face = "bold"),
        panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
        legend.key=element_blank()) +
- labs(x = "NMDS1", colour = "Depth", y = "NMDS2")
-xx2
-ggsave("Shipwreck_NMDS_depth.tiff")
+ labs(x = "NMDS1", colour = "Depth (in ft)", y = "NMDS2")
+xxBW2
+ggsave("Shipwreck_NMDS_depth_adjusted.tiff")
 ```
 
-### NMDS Waterlevel
+### NMDS Starboard vs Port Side
 ```{r}
-data.scores3 <- as.data.frame(scores(nmds)$sites)
-data.scores3$water_level = pc$water_level
-data.scores3$sample_id = pc$sample_id
-head(data.scores3)
-write.table(data.scores3, "nmds_data.scores_water_level.csv", sep=",", quote=F, col.names=NA)
-```
-
-```{r}
-xx3 = ggplot(data.scores3, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 2, aes(colour = water_level))+
- theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"),
-       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
-       legend.text = element_text(size = 12, face ="bold", colour ="black"),
-       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
-       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
-       legend.title = element_text(size = 14, colour = "black", face = "bold"),
-       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
-       legend.key=element_blank()) +
- labs(x = "NMDS1", colour = "water_level", y = "NMDS2")
-xx3
-ggsave("Shipwreck_NMDS_waterlevel.tiff")
-```
-
-## Stacked Barchart & NMDS: Starboard vs Port Side
-
-### Prepping files into data.frame
-```{r}
-df1_ship <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df1_star_port_samples_only.csv")
-df1_ship
-df2_ship <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/df2_star_port_samples_only.csv")
-df2_ship
-df_list2 <- list(df1_ship, df2_ship)
-df_list2
-
-otu_count_ship <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list2) %>%
-  pivot_longer(-sample_id, names_to = "ASV", values_to = "count")
-otu_count_ship
-
-write.table(otu_count_ship, "otu_count_ship.csv", sep=",", quote=F, col.names=NA)
-write.table(nmds_asv_otu, "nmds_asv_otu.csv", sep=",", quote=F, col.names=NA)
-```
-
-### Gaining OTU Relative Abundance Values
-```{r}
-otu_rel_abund_ship <- inner_join(metadata_star_port_only, otu_count_ship, by="sample_id") %>%
-  inner_join(., taxonomy, by="ASV") %>%
-  group_by(sample_id) %>%
-  mutate(rel_abund = count / sum(count)) %>%
-  ungroup() %>%
-  pivot_longer(cols=c("Kingdom", "Phylum", "Class", "Order", "Genus", "ASV"),
-         names_to="level",
-         values_to="taxon")
-otu_rel_abund_ship
-write.table(otu_rel_abund_ship, "otu_rel_abund_ship.csv", sep=",", quote=F, col.names=NA)
-```
-
-### Stacked Barchart of Starboard vs Port Side Samples Only
-```{r}
-otu_rel_abund_ship %>%
-  filter(level=="Phylum") %>%
-  group_by(sample_id, location, taxon) %>%
-  summarize(rel_abund = sum(rel_abund)) %>%
-  group_by(location, taxon) %>%
-  summarize(mean_rel_abund = 100*mean(rel_abund)) %>%
-  ggplot(aes(x=location, y=mean_rel_abund, fill=taxon)) +
-  geom_col(aes(x=location, y=mean_rel_abund), colour="black", stroke=10) +
-    labs(x=NULL, 
-         y="Mean Relative Abundance (%)") +
-    theme_classic()
-ggsave("star_port_stacked_bar.tiff", width=12, height=10)
-```
-
-### Prepping NMDS files into workable data.frame
-```{r}
-pc2 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu_ship.csv")
+pc2 <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu_star_port_biofilm_water.csv")
 pc2
 ```
 
 ```{r}
 com2 = pc2[,7:ncol(pc2)]
 com2
-```
 
-```{r}
 m_com2 <- as.matrix(com2)
 m_com2
 ```
 
 ```{r}
-set.seed(100)
+set.seed(1000)
 nmds2 = metaMDS(m_com2, distance = "bray")
-plot(nmds2)
 ```
 
 ```{r}
@@ -503,12 +542,13 @@ data.scores2 <- as.data.frame(scores(nmds2)$sites)
 data.scores2$location = pc2$location
 data.scores2$sample_id = pc2$sample_id
 head(data.scores2)
-write.table(data.scores2, "nmds_data.scores_star_port.csv", sep=",", quote=F, col.names=NA)
 ```
 
 ```{r}
 xx4 = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
- geom_point(size = 2, aes(shape = location, colour = location))+
+ geom_point(size = 3, aes(shape = location, colour = location))+
+  ggtitle("NMDS Ordination - Sample Location") +
+  scale_fill_discrete()+
  theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
        axis.text.x = element_text(colour = "black", face = "bold", size = 12),
        legend.text = element_text(size = 12, face ="bold", colour ="black"),
@@ -519,87 +559,607 @@ xx4 = ggplot(data.scores2, aes(x = NMDS1, y = NMDS2)) +
        legend.key=element_blank()) +
  labs(x = "NMDS1", colour = "location", y = "NMDS2")
 xx4
-ggsave("Shipwreck_star_port_only.tiff")
 ```
 
-
-## Diversity Index Value Generating
 ```{r}
-otu_table <- read.csv("/Users/maggieshostak/Desktop/Shipwreck/data/nmds_asv_otu.csv", header=T, row.names=1, check.names=FALSE)
+ggsave("Shipwreck_NMDS_Star_Port_adjusted_bio_water.tiff")
+```
+
+### NMDS Waterlevel
+```{r}
+data.scores.BW3 <- as.data.frame(scores(nmdsBW)$sites)
+data.scores.BW3$water_level = pcBW$water_level
+data.scores.BW3$sample_id = pcBW$sample_id
+head(data.scores.BW3)
+```
+
+```{r}
+xxSPBW = ggplot(data.scores.BW3, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(shape = water_level, colour = water_level))+
+  ggtitle("NMDS Ordination - Sample Water-level") +
+  scale_fill_discrete()+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "water_level", y = "NMDS2")
+xxSPBW
+```
+
+```{r}
+ggsave("Shipwreck_NMDS_water_level_adjusted.tiff")
+```
+
+# NMDS: Biofilm Samples Only
+
+```{r}
+pcB = read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu_biofilm.csv")
+pcB
+```
+
+```{r}
+comB = pcB[,6:ncol(pcB)]
+comB
+m_comB <- as.matrix(comB)
+m_comB
+
+set.seed(1000)
+nmdsB = metaMDS(m_comB, distance = "bray")
+```
+
+```{r}
+data.scoresB <- as.data.frame(scores(nmdsB)$sites)
+data.scoresB$location = pcB$location
+data.scoresB$sample_id = pcB$sample_id
+head(data.scoresB)
+```
+
+Make NMDS Plot
+```{r}
+xxB = ggplot(data.scoresB, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(colour = location))+
+  scale_fill_discrete()+
+  ggtitle("NMDS Ordination - Sample Location")+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "location", y = "NMDS2")
+xxB
+```
+
+```{r}
+ggsave("Shipwreck_NMDS_location_adjusted_biofilm_only.tiff")
+```
+
+### Biofilm Only: Star vs Port
+```{r}
+pcSP <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu_star_port_biofilm.csv")
+pcSP
+```
+
+```{r}
+comSP = pcSP[,7:ncol(pcSP)]
+comSP
+
+m_comSP <- as.matrix(comSP)
+m_comSP
+```
+
+```{r}
+set.seed(1000)
+nmdsSP = metaMDS(m_comSP, distance = "bray")
+```
+
+```{r}
+data.scoresSP <- as.data.frame(scores(nmdsSP)$sites)
+data.scoresSP$location = pcSP$location
+data.scoresSP$sample_id = pcSP$sample_id
+head(data.scoresSP)
+```
+
+```{r}
+xx4 = ggplot(data.scoresSP, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(shape = location, colour = location))+
+  ggtitle("NMDS Ordination - Sample Location") +
+  scale_fill_discrete()+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "location", y = "NMDS2")
+xx4
+```
+
+```{r}
+ggsave("Shipwreck_NMDS_Star_Port_adjusted_star_port_biofilm.tiff")
+```
+
+# Phyloseq
+```{r}
+theme_set(theme_bw())
+```
+
+```{r}
+samples.out <- rownames(seqtab.nochim)
+samples <- sapply(strsplit(samples.out, "Shos-"), `[`, 2)
+samples
+```
+
+```{r}
+map <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/metadata_biofilm.csv")
+map
+```
+
+```{r}
+location <-map[,2,ncol(map)]
+location
+```
+
+```{r}
+depth <- map[,3,ncol(map)]
+depth
+```
+
+```{r}
+waterlevel <- map[,4,ncol(map)]
+waterlevel
+```
+
+```{r}
+samdf <- data.frame(Location=location, Depth=depth, Waterlevel=waterlevel)
+samdf$Waterlevel <- "Waterline"
+samdf$Waterlevel[samdf$Depth>0] <- "Below Water"
+rownames(samdf) <- samples.out
+```
+
+```{r}
+ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), sample_data(samdf), tax_table(taxa))
+ps <- prune_samples(sample_names(ps), ps)
+```
+
+```{r}
+dna <- Biostrings::DNAStringSet(taxa_names(ps))
+names(dna) <- taxa_names(ps)
+ps <- merge_phyloseq(ps, dna)
+taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
+ps
+```
+
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 15239 taxa and 89 samples ]
+sample_data() Sample Data:       [ 89 samples by 3 sample variables ]
+tax_table()   Taxonomy Table:    [ 15239 taxa by 6 taxonomic ranks ]
+refseq()      DNAStringSet:      [ 15239 reference sequences ]
+
+```{r}
+plot_richness(ps, x="Depth", measures=c("Shannon", "Simpson"), color="Waterlevel")
+```
+
+```{r}
+plot_richness(ps, x="Depth", measures=c("Shannon", "Simpson"), color="Location")
+```
+
+```{r}
+plot_richness(ps, x="Location", measures=c("Shannon", "Simpson"), color="Depth")
+```
+
+```{r}
+plot_richness(ps, x="Location", measures=c("Shannon", "Simpson"), color="Waterlevel")
+```
+
+```{r}
+plot_richness(ps, x="Waterlevel", measures=c("Shannon", "Simpson"), color="Location")
+```
+
+```{r}
+plot_richness(ps, x="Waterlevel", measures=c("Shannon", "Simpson"), color="Depth")
+```
+
+```{r}
+ps.prop <- transform_sample_counts(ps, function(otu) otu/sum(otu))
+
+ord.nmds.bray <- ordinate(ps.prop, method="NMDS", distance="bray")
+
+plot_ordination(ps.prop, ord.nmds.bray, color="Waterlevel", title="Bray NMDS")
+```
+
+```{r}
+ps.prop <- transform_sample_counts(ps, function(otu) otu/sum(otu))
+
+ord.nmds.bray <- ordinate(ps.prop, method="NMDS", distance="bray")
+
+plot_ordination(ps.prop, ord.nmds.bray, color="Location", title="Bray NMDS")
+```
+
+```{r}
+ps.prop <- transform_sample_counts(ps, function(otu) otu/sum(otu))
+
+ord.nmds.bray <- ordinate(ps.prop, method="NMDS", distance="bray")
+
+plot_ordination(ps.prop, ord.nmds.bray, color="Depth", title="Bray NMDS")
+```
+
+# Statistical Analysis: ANOSIM, ANOVA, SIMPER
+## ANOSIM Statistical Testing
+### Location Biofilm
+Make community matrix - extract columns with abundance information, turn data frame into matrix
+```{r}
+pcL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Location_Biofilm.csv")
+pcL
+
+comL = pcL[,3:ncol(pcL)]
+comL
+
+m_comL = as.matrix(comL)
+m_comL
+
+anoL = anosim(m_comL, pcL$location, distance = "bray", permutations = 9999)
+anoL
+```
+
+### Depth Biofilm
+```{r}
+pcD <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Depth_Biofilm.csv")
+pcD
+
+comD = pcD[,3:ncol(pcD)]
+comD
+
+m_comD = as.matrix(comD)
+m_comD
+
+anoD = anosim(m_comD, pcD$depth, distance = "bray", permutations = 9999)
+anoD
+```
+
+### Water-level Biofilm
+```{r}
+pcWL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Waterlevel_Biofilm.csv")
+pcWL
+
+comWL = pcWL[,3:ncol(pcWL)]
+comWL
+
+m_comWL = as.matrix(comWL)
+m_comWL
+
+anoWL = anosim(m_comWL, pcWL$water_level, distance = "bray", permutations = 9999)
+anoWL
+```
+
+## Starboard vs Port
+### SP Location Biofilm
+```{r}
+pcSPL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Location_SP_Biofilm.csv")
+pcSPL
+
+comSPL = pcSPL[,3:ncol(pcSPL)]
+comSPL
+
+m_comSPL = as.matrix(comSPL)
+m_comSPL
+
+anoSPL = anosim(m_comSPL, pcSPL$location, distance = "bray", permutations = 9999)
+anoSPL
+```
+
+### SP Depth Biofilm
+```{r}
+pcSPD <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Depth_SP_Biofilm.csv")
+pcSPD
+
+comSPD = pcSPD[,3:ncol(pcSPD)]
+comSPD
+
+m_comSPD = as.matrix(comSPD)
+m_comSPD
+
+anoSPD = anosim(m_comSPD, pcSPD$depth, distance = "bray", permutations = 9999)
+anoSPD
+```
+
+### SP Water-level Biofilm
+```{r}
+pcSPWL <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/ANOSIM_Waterlevel_SP_Biofilm.csv")
+pcSPWL
+
+comSPWL = pcSPWL[,3:ncol(pcSPWL)]
+comSPWL
+
+m_comSPWL = as.matrix(comSPWL)
+m_comSPWL
+
+anoSPWL = anosim(m_comSPWL, pcSPWL$water_level, distance = "bray", permutations = 9999)
+anoSPWL
+```
+
+When interpreting these results you want to look at the ANOSIM statistic R and the Significance values. 
+
+“The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high and low ranks within and between groups” (GUSTAME). In other words, *the higher the R value, the more dissimilar your groups are in terms of microbial community composition!*
+
+A *Significance value less than 0.05 is generally considered to be statistically significant*, and means the null hypothesis can be rejected. Therefore, *there is a statistically significant difference in the microbial communities between your groups*. *Greater than 0.05, means that there is no statistical difference between the microbial communities in your groups.*
+
+# Diversity Index Value Generating
+## Biofilm & Water Samples
+```{r}
+otu_table <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/asv_otu.csv", header=T, row.names=1, check.names=FALSE)
 ```
 
 Transpose the data to have sample names on rows
 ```{r}
-t_otu_table <-t(otu_table)
-data(t_otu_table)
-H<-diversity(t_otu_table)
-simp<-diversity(t_otu_table, "simpson")
-invsimp<-diversity(t_otu_table, "inv")
+otu.table.diver <- t(otu_table)
+otu.table.diver <- as.data.frame(otu.table.diver)
+head(otu.table.diver)
 ```
 
-Unbiased Simpson (Hurlbert 1971, eq. 5) with rarefy:
+### Shannon
 ```{r}
-unbias.simp <- rarefy(t_otu_table, 2) - 1
+data(otu.table.diver)
+H<-diversity(otu.table.diver)
+H
 ```
 
-Fisher alpha
+### Richness
 ```{r}
-alpha <- fisher.alpha(t_otu_table)
+richness <- specnumber(otu.table.diver)
 ```
 
-Species richness (S) and Pielou's evenness (J):
+### Pielou Evenness
 ```{r}
-S <- specnumber(t_otu_table)
-J <- H/log(S)
-```
-
-Plot all
-```{r}
-pairs(cbind(H, simp, invsimp, unbias.simp, alpha), pch="+", col="red")
-alpha
+eveness <- H/log(richness)
 ```
 
 ```{r}
-write.table(J, "/Users/maggieshostak/desktop/pielou_evenness.txt", sep="\t")
-```
-
-## ANOSIM Test
-
-```{r}
-pc_ano = read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/nmds_asv_otu.csv", header= TRUE)
-```
-
-Make community matrix - extract columns with abundance information, turn data frame into matrix
-```{r}
-com3 = pc_ano[,7:ncol(pc_ano)]
-m_com3 = as.matrix(com3)
+metadata_bio_water <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/metadata_bio_water.csv")
+metadata_bio_water
 ```
 
 ```{r}
-ano = anosim(m_com3, pc$location, distance = "bray", permutations = 9999)
-ano
-
-ano2 = anosim(m_com3, pc$water_level, distance = "bray", permutations = 9999)
-ano2
-
-ano3 = anosim(m_com3, pc$depth, distance = "bray", permutations = 9999)
-ano3
+alphaBW <- cbind(shannon = H, richness = richness, pielou = eveness, metadata_bio_water)
+write.csv(alphaBW, "diversity_indices_bio_water.csv")
+head(alphaBW)
 ```
 
-### Results
-*Location*: (R = 0.3495, Significance = 0.0001)
-
-*Water_Level*: (R = 0.4067, Significance = 0.0001)
-
-*Depth*: (R = 0.4701, Significance = 0.0001)
-
-When interpreting these results you want to look at the ANOSIM statistic "R" & the Significance values. 
-  - A Significance value <0.05 is generally considered to be statistically significant, & means the null hypothesis can be rejected. Therefore, there is a statistically significant difference in the microbial communities between your groups. 
-  - A Significance value >0.05, means that there is no statistical difference between the microbial communities in your groups.
-
-The ANOSIM statistic “R” compares the mean of ranked dissimilarities between groups to the mean of ranked dissimilarities within groups. An R value close to “1.0” suggests dissimilarity between groups while an R value close to “0” suggests an even distribution of high & low ranks within & between groups. In other words, the higher the R value, the more dissimilar your groups are in terms of microbial community composition!
-
-# Distance Matrix & PCA
 ```{r}
+plot.shan <- ggplot(alphaBW, aes(x = location, y = shannon, colour = location)) +
+  geom_point(size = 3) +
+  ylab("Shannon's H'") + 
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.shan
+ggsave("Shannon_Location_bio_water.tiff")
+```
 
+```{r}
+plot.rich <-ggplot(alphaBW, aes(x = location, y = richness, colour = location)) +
+  geom_point(size = 3) +
+  ylab("Species Richness") +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.rich
+ggsave("Richness_Location_bio_water.tiff")
+```
+
+```{r}
+plot.even <- ggplot(alphaBW, aes(x = location, y = pielou, colour = location)) +
+  geom_point(size = 3) +
+  ylab("Pielou's Evenness") +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.even
+ggsave("Pielou's_Evenness_Location_bio_water.tiff")
+```
+
+```{r}
+legend <- get_legend(plot.even)
+
+plot_grid(plot.shan + theme(legend.position = "none"), plot.rich + theme(legend.position = "none"), plot.even + theme(legend.position = "none"),ncol = 3)
+
+ggsave("Shannon_Richness_Eveness_bio_water.tiff")
+```
+
+## Biofilm Only
+```{r}
+otu_table_bio <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/asv_otu_biofilm.csv", header=T, row.names=1, check.names=FALSE)
+head(otu_table_bio)
+```
+
+Transpose the data to have sample names on rows
+```{r}
+otu.table.diver.bio <- t(otu_table_bio)
+otu.table.diver.bio <- as.data.frame(otu.table.diver.bio)
+head(otu.table.diver.bio)
+#write.csv(otu.table.diver.bio, "otu.table.diversity.biofilm.csv")
+```
+
+```{r}
+data(otu.table.diver.bio)
+H<-diversity(otu.table.diver.bio)
+H
+```
+
+```{r}
+richness <- specnumber(otu.table.diver.bio)
+
+eveness <- H/log(richness)
+```
+
+```{r}
+metadata_bio <- read.csv("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/data/metadata_biofilm.csv")
+metadata_bio
+```
+
+```{r}
+alphaBio <- cbind(shannon = H, richness = richness, pielou = eveness, metadata_bio)
+write.csv(alphaBio, "diversity_indices_biofilm.csv")
+head(alphaBio)
+```
+
+```{r}
+plot.shan <- ggplot(alphaBio, aes(x = location, y = shannon, colour = location)) +
+  geom_point(size = 3) +
+  ylab("Shannon's H'") + 
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.shan
+ggsave("Shannon_Location_biofilm.tiff")
+```
+
+```{r}
+plot.rich <-ggplot(alphaBio, aes(x = location, y = richness, colour = location)) +
+  geom_point(size = 3) +
+  ylab("Species Richness") +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.rich
+ggsave("Richness_Location_biofilm.tiff")
+```
+
+```{r}
+plot.even <- ggplot(alphaBio, aes(x = location, y = pielou, colour = location)) +
+  geom_point(size = 3) +
+  ylab("Pielou's Evenness") +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.even
+ggsave("Pielou's_Evenness_Location_biofilm.tiff")
+```
+
+```{r}
+legend <- get_legend(plot.even)
+
+plot_grid(plot.shan + theme(legend.position = "none"), plot.rich + theme(legend.position = "none"), plot.even + theme(legend.position = "none"),ncol = 3)
+
+ggsave("Shannon_Richness_Eveness_biofilm.tiff")
+```
+
+# ANOVA
+## Location
+```{r}
+anova <- aov(shannon ~ location, alpha)
+summary(anova)
+```
+
+## Depth
+```{r}
+anova <- aov(shannon ~ depth, alpha)
+summary(anova)
+```
+
+## Water_Level
+```{r}
+anova <- aov(shannon ~ water_level, alpha)
+summary(anova)
+```  
+
+# SIMPER: Pairwise Dissimilarity
+```{r}
+otu.table.diver.mdf.bio <- as.matrix.data.frame(otu.table.diver.bio)
+rownames(otu.table.diver.mdf.bio) <- metadata_bio$location
+
+otu.table.diver.bray.bio <- vegdist(otu.table.diver.mdf.bio, method="bray")
+otu.table.diver.bray.bio
+```
+
+## Location
+```{r}
+simper2 <- simper(otu.table.diver.bio, metadata_bio$location, permutations=999)
+options(max.print=999999)
+summary(simper2)
+dput(simper2, file = "simp_location.txt")
+sim2 <- dget("/Users/maggieshostak/Desktop/FeOB_Shipwreck_Analysis/doc/simp_location.txt")
+summary(sim2)
+```
+
+## Depth
+```{r}
+simper <- simper(otu.table.diver.bio, metadata_bio$depth, permutations=999)
+summary(simper)
+options(max.print=999999)
+```
+
+## Water Level
+```{r}
+simper3 <- simper(otu.table.diver.bio, metadata_bio$water_level, permutations=999)
+summary(simper3)
+options(max.print=999999)
+
+# PCoA
+```{r}
+#calculate principle coordinate analysis (Bray-Curtis)
+pcoa.otu.table.diver.bray.bio <- cmdscale(otu.table.diver.bray.bio, k=2, eig=T)
+```
+
+```{r}
+#extract axis positions for each location from cmdscale object & create dataframe for plotting
+pcoa.otu.table.diver.bray.plotting.bio <- as.data.frame(pcoa.otu.table.diver.bray.bio$points)
+colnames(pcoa.otu.table.diver.bray.plotting.bio) <- c("axis_1", "axis_2")
+pcoa.otu.table.diver.bray.plotting.bio$location <- rownames(pcoa.otu.table.diver.bray.plotting.bio)
+```
+
+```{r}
+#calculate proportion of variance in the data which is explained by the first 2 PCOA axes
+pcoa.otu.table.diver.bray.bio$eig[1]/(sum(pcoa.otu.table.diver.bray.bio$eig))
+```
+
+```{r}
+pcoa.otu.table.diver.bray.bio$eig[2]/(sum(pcoa.otu.table.diver.bray.bio$eig))
+```
+
+```{r}
+#create PCoA plot
+pcoa.otu.bray.plot.bio <- ggplot(pcoa.otu.table.diver.bray.plotting.bio, aes(x = axis_1, y = axis_2, colour = location)) +
+  geom_point(size = 3) +
+  theme_bw() + 
+  xlab("PCoA 1 (11.1%)") +
+  ylab("PCoA 2 (6.14%)") +
+  annotate(geom = 'text', label = 'Bray-Curtis', x = Inf, y = -Inf, hjust = 1.15, vjust = -1)
+pcoa.otu.bray.plot.bio
+ggsave("PCoA_Location_Biofilm.tiff", width=15, height=7) 
+```
+
+# PERMANOVA
+Homogeneity of dispersion test
+```{r}
+permutest(betadisper(otu.table.diver.bray.bio, metadata_bio$location))
+```
+
+```{r}
+permutest(betadisper(otu.table.diver.bray.bio, metadata_bio$depth))
+```
+
+```{r}
+permutest(betadisper(otu.table.diver.bray.bio, metadata_bio$water_level))
+```
+
+# Adonis Analysis
+```{r}
+adonis(otu.table.diver.bray.bio ~ location, data = metadata_bio, permutations = 999)
+```
+
+```{r}
+adonis(otu.table.diver.bray.bio ~ depth, data = metadata_bio, permutations = 999)
+```
+
+```{r}
+adonis(otu.table.diver.bray.bio ~ water_level, data = metadata_bio, permutations = 999)
 ```
