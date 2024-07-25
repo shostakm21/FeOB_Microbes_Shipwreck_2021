@@ -1327,3 +1327,228 @@ sim <- dget("/Users/maggieshostak/Desktop/RStudio Work/data/simp_location.txt")
 summary(sim)
 ```
 
+# Rarefaction
+```{r}
+library(tidyverse) ; packageVersion("tidyverse") # 1.3.1
+library(phyloseq) ; packageVersion("phyloseq") # 1.22.3
+library(vegan) ; packageVersion("vegan") # 2.5.4
+library(DESeq2) ; packageVersion("DESeq2") # 1.18.1
+library(viridis) ; packageVersion("viridis") # 0.5.1
+library(phyloseq)
+library(ggplot2)
+library(devtools)
+library(ggpubr)
+```
+
+# TESTING ALL SAMPLES
+```{r}
+count_tab <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_otu_original_copy.csv", header=T, row.names=1, check.names=F, sep=",")
+count_tab
+
+tax_tab <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_tax_original_copy.csv", header=T, row.names=1, check.names=F, sep=",")
+tax_tab
+
+metadata <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/metadata_copy.csv")
+metadata
+```
+
+```{r}
+deseq_counts <- DESeqDataSetFromMatrix(countData = count_tab, colData = metadata, design = ~sample_id) 
+deseq_counts <- estimateSizeFactors(deseq_counts, type = "poscounts")
+deseq_counts_vst <- varianceStabilizingTransformation(deseq_counts)
+vst_trans_count_tab <- assay(deseq_counts_vst)
+euc_dist <- dist(t(vst_trans_count_tab))
+
+euc_clust <- hclust(euc_dist, method="ward.D2")
+plot(euc_clust) 
+euc_dend <- as.dendrogram(euc_clust, hang=0.1)
+dend_cols <- as.character(metadata$color[order.dendrogram(euc_dend)])
+labels_colors(euc_dend) <- dend_cols
+
+plot(euc_dend, ylab="VST Euc. dist.", width = 35, height = 35 )
+```
+
+```{r}
+rarecurve(t(count_tab), step=500, col=metadata$color, lwd=2, ylab="ASVs", label=F, cex=0.6)
+  abline(v=(min(rowSums(t(count_tab)))), col = "red")
+```
+
+# TESTING WITHOUT SAMPLES 16 & 48 & 51
+```{r}
+count_tab_a <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_otu_no_16_48.csv", header=T, row.names=1, check.names=F, sep=",")
+count_tab_a
+
+tax_tab_a <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_tax_original_copy.csv", header=T, row.names=1, check.names=F, sep=",")
+tax_tab_a
+
+metadata_a <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/metadata_no_16_48.csv")
+metadata_a
+```
+
+```{r}
+deseq_counts_a <- DESeqDataSetFromMatrix(countData = count_tab_a, colData = metadata_a, design = ~sample_id) 
+deseq_counts_a <- estimateSizeFactors(deseq_counts_a, type = "poscounts")
+deseq_counts_vst_a <- varianceStabilizingTransformation(deseq_counts_a)
+
+vst_trans_count_tab_a <- assay(deseq_counts_vst_a)
+
+euc_dist_a <- dist(t(vst_trans_count_tab_a))
+
+euc_clust_a <- hclust(euc_dist_a, method="ward.D2")
+plot(euc_clust_a) 
+
+euc_dend_a <- as.dendrogram(euc_clust_a, hang=0.1)
+dend_cols_a <- as.character(metadata_a$color[order.dendrogram(euc_dend_a)])
+labels_colors(euc_dend_a) <- dend_cols_a
+
+plot(euc_dend_a, ylab="VST Euc. dist.", width = 35, height = 35 )
+```
+
+```{r}
+rarecurve(t(count_tab_a), step=500, lwd=2, col=metadata_a$color, ylab="ASVs", label=T, cex=0.6)
+  abline(v=(min(rowSums(t(count_tab_a)))), col = "red")
+```
+
+# TESTING WITHOUT SAMPLES 16 & 48 & 51
+```{r}
+count_tab_b <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_otu_no_16_48_51.csv", header=T, row.names=1, check.names=F, sep=",")
+count_tab_b
+
+tax_tab_b <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_tax_original_copy.csv", header=T, row.names=1, check.names=F, sep=",")
+tax_tab_b
+
+metadata_b <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/metadata_no_16_48_51.csv")
+metadata_b
+```
+
+```{r}
+deseq_counts_b <- DESeqDataSetFromMatrix(countData = count_tab_b, colData = metadata_b, design = ~sample_id) 
+deseq_counts_b <- estimateSizeFactors(deseq_counts_b, type = "poscounts")
+deseq_counts_vst_b <- varianceStabilizingTransformation(deseq_counts_b)
+
+vst_trans_count_tab_b <- assay(deseq_counts_vst_b)
+
+euc_dist_b <- dist(t(vst_trans_count_tab_b))
+
+euc_clust_b <- hclust(euc_dist_b, method="ward.D2")
+plot(euc_clust_b) 
+
+euc_dend_b <- as.dendrogram(euc_clust_b, hang=0.1)
+dend_cols_b <- as.character(metadata_b$color[order.dendrogram(euc_dend_b)])
+labels_colors(euc_dend_b) <- dend_cols_b
+
+plot(euc_dend_b, ylab="VST Euc. dist.", width = 35, height = 35 )
+```
+
+```{r}
+rarecurve(t(count_tab_b), step=500, lwd=2, col=metadata_b$color, ylab="ASVs", label=T, cex=0.6)
+  abline(v=(min(rowSums(t(count_tab_b)))), col = "red")
+```
+
+# TESTING BASED ON SAMPLE TYPE: Biofilm
+```{r}
+count_tab_B <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_otu_biofilm.csv", header=T, row.names=1, check.names=F, sep=",")
+count_tab_B
+
+tax_tab_B <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_tax_original_copy.csv", header=T, row.names=1, check.names=F, sep=",")
+tax_tab_B
+
+metadata_B <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/metadata_biofilm.csv")
+metadata_B
+```
+
+```{r}
+deseq_counts_B <- DESeqDataSetFromMatrix(countData = count_tab_B, colData = metadata_B, design = ~sample_id) 
+deseq_counts_B <- estimateSizeFactors(deseq_counts_B, type = "poscounts")
+deseq_counts_vst_B <- varianceStabilizingTransformation(deseq_counts_B)
+
+vst_trans_count_tab_B <- assay(deseq_counts_vst_B)
+
+euc_dist_B <- dist(t(vst_trans_count_tab_B))
+
+euc_clust_B <- hclust(euc_dist_B, method="ward.D2")
+plot(euc_clust_B) 
+
+euc_dend_B <- as.dendrogram(euc_clust_B, hang=0.1)
+dend_cols_B <- as.character(metadata_B$color[order.dendrogram(euc_dend_B)])
+labels_colors(euc_dend_B) <- dend_cols_B
+
+plot(euc_dend_B, ylab="VST Euc. dist.", width = 35, height = 35 )
+```
+
+```{r}
+rarecurve(t(count_tab_B), step=500, lwd=2, col=metadata_B$color, ylab="ASVs", label=T, cex=0.6)
+  abline(v=(min(rowSums(t(count_tab_B)))), col = "red")
+```
+
+# TESTING BASED ON SAMPLE TYPE: Sediment
+```{r}
+count_tab_S <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_otu_sed.csv", header=T, row.names=1, check.names=F, sep=",")
+count_tab_S
+
+tax_tab_S <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_tax_original_copy.csv", header=T, row.names=1, check.names=F, sep=",")
+tax_tab_S
+
+metadata_S <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/metadata_sed.csv")
+metadata_S
+```
+
+```{r}
+deseq_counts_S <- DESeqDataSetFromMatrix(countData = count_tab_S, colData = metadata_S, design = ~sample_id) 
+deseq_counts_S <- estimateSizeFactors(deseq_counts_S, type = "poscounts")
+deseq_counts_vst_S <- varianceStabilizingTransformation(deseq_counts_S)
+
+vst_trans_count_tab_S <- assay(deseq_counts_vst_S)
+
+euc_dist_S <- dist(t(vst_trans_count_tab_S))
+
+euc_clust_S <- hclust(euc_dist_S, method="ward.D2")
+plot(euc_clust_S) 
+
+euc_dend_S <- as.dendrogram(euc_clust_S, hang=0.1)
+dend_cols_S <- as.character(metadata_S$color[order.dendrogram(euc_dend_S)])
+labels_colors(euc_dend_S) <- dend_cols_S
+
+plot(euc_dend_S, ylab="VST Euc. dist.", width = 35, height = 35 )
+```
+
+```{r}
+rarecurve(t(count_tab_S), step=500, lwd=2, col=metadata_S$color, ylab="ASVs", label=T, cex=0.6)
+  abline(v=(min(rowSums(t(count_tab_S)))), col = "red")
+```
+
+# TESTING BASED ON SAMPLE TYPE: Water
+```{r}
+count_tab_W <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_otu_water.csv", header=T, row.names=1, check.names=F, sep=",")
+count_tab_W
+
+tax_tab_W <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/asv_tax_original_copy.csv", header=T, row.names=1, check.names=F, sep=",")
+tax_tab_W
+
+metadata_W <- read.csv("/Users/maggieshostak/Desktop/rarefaction_testing/metadata_water.csv")
+metadata_W
+```
+
+```{r}
+deseq_counts_W <- DESeqDataSetFromMatrix(countData = count_tab_W, colData = metadata_W, design = ~sample_id) 
+deseq_counts_W <- estimateSizeFactors(deseq_counts_W, type = "poscounts")
+deseq_counts_vst_W <- varianceStabilizingTransformation(deseq_counts_W)
+
+vst_trans_count_tab_W <- assay(deseq_counts_vst_W)
+
+euc_dist_W <- dist(t(vst_trans_count_tab_W))
+
+euc_clust_W <- hclust(euc_dist_W, method="ward.D2")
+plot(euc_clust_W) 
+
+euc_dend_W <- as.dendrogram(euc_clust_W, hang=0.1)
+dend_cols_W <- as.character(metadata_W$color[order.dendrogram(euc_dend_W)])
+labels_colors(euc_dend_W) <- dend_cols_W
+
+plot(euc_dend_W, ylab="VST Euc. dist.", width = 35, height = 35 )
+```
+
+```{r}
+rarecurve(t(count_tab_W), step=500, lwd=2, col=metadata_W$color, ylab="ASVs", label=T, cex=0.6)
+  abline(v=(min(rowSums(t(count_tab_W)))), col = "red")
+```
