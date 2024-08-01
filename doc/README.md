@@ -933,9 +933,6 @@ Number of permutations: 9999
 
 ```{r}
 
-```
-
-
 ```{r}
 #Depth Specific Biofilm
 pcD <- read.csv("/Users/maggieshostak/Desktop/RStudio Work/data/ANOSIM_Depth_Biofilm.csv")
@@ -1552,3 +1549,262 @@ plot(euc_dend_W, ylab="VST Euc. dist.", width = 35, height = 35 )
 rarecurve(t(count_tab_W), step=500, lwd=2, col=metadata_W$color, ylab="ASVs", label=T, cex=0.6)
   abline(v=(min(rowSums(t(count_tab_W)))), col = "red")
 ```
+
+## NMDS Ordination Plot Check
+```{r}
+df1 <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_1.csv")
+df1
+df2 <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_2.csv")
+df2
+df_otu_5000 <- list(df1, df2)
+df_otu_5000
+
+#write.table(df_otu_5000, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_otu_5000.csv", sep=",", quote=F, col.names=NA)
+
+otu_count_5000 <- Reduce(function(x, y) merge(x, y, all=TRUE), df_otu_5000) %>%
+  pivot_longer(-sample_id, names_to = "ASV", values_to = "count")
+
+#write.table(otu_count_5000, "otu_count_5000.csv", sep=",", quote=F, col.names=NA)
+
+otu_count_5000 %>%
+  group_by(sample_id) %>%
+  mutate(total = sum(count)) %>%
+  filter(total > 5000) %>%
+  group_by(ASV) %>%
+  mutate(total=sum(count)) %>% 
+  filter(total != 0) %>%
+  as.data.frame()
+#Going to set threshold at 5000
+```
+
+```{r}
+df_meta_5000 <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/metadata_5000_cutoff.csv")
+df_meta_5000
+
+df_otu_5000 <-read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_otu_5000.csv", row.names=1 )
+df_otu_5000
+
+nmds_asv_otu_all_5000 <- inner_join(df_meta_5000, df_otu_5000, by="sample_id")
+
+write.table(nmds_asv_otu_all_5000, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_5000.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+## All Samples: By Location
+pcX <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_biofilm_sep_sed_water_5000.csv")
+pcX
+```
+
+```{r}
+comX = pcX[,4:ncol(pcX)]
+comX
+
+m_comX <- as.matrix(comX)
+#m_comX
+```
+
+```{r}
+set.seed(1000)
+nmdsX = metaMDS(m_comX, distance = "bray")
+
+data.scoresX <- as.data.frame(scores(nmdsX)$sites)
+data.scoresX$location = pcX$location
+data.scoresX$sample_id = pcX$sample_id
+head(data.scoresX)
+
+xxX = ggplot(data.scoresX, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(colour = location))+
+  scale_fill_discrete()+
+  ggtitle("NMDS Ordination - Samples Across Site")+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "location", y = "NMDS2")
+xxX
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/NMDS_all_samples_location_5000.tiff", width = 10, height = 10)
+```
+
+## NMDS Plot Check: Star vs Port
+```{r}
+df1_SP <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_1_SP.csv")
+df1_SP
+
+df2_SP <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_2_SP.csv")
+df2_SP
+
+df_otu_5000_SP <- list(df1_SP, df2_SP)
+df_otu_5000_SP
+
+write.table(df_otu_5000_SP, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_otu_5000_SP.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+df_meta_5000_SP <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/metadata_5000_SP.csv")
+df_meta_5000_SP
+
+df_otu_5000_SP <-read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_otu_5000_SP.csv", row.names=1 )
+df_otu_5000_SP
+
+nmds_asv_otu_SP_5000 <- inner_join(df_meta_5000_SP, df_otu_5000_SP, by="sample_id")
+
+write.table(nmds_asv_otu_SP_5000, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_SP_5000.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+## All Samples: By Location
+pcX2 <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_SP_5000.csv")
+pcX2
+```
+
+```{r}
+comX2 = pcX2[,4:ncol(pcX2)]
+comX2
+
+m_comX2 <- as.matrix(comX2)
+#m_comX2
+```
+
+```{r}
+set.seed(1000)
+nmdsX2 = metaMDS(m_comX2, distance = "bray")
+
+data.scoresX2 <- as.data.frame(scores(nmdsX2)$sites)
+data.scoresX2$location = pcX2$location
+data.scoresX2$sample_id = pcX2$sample_id
+head(data.scoresX2)
+
+xxX2 = ggplot(data.scoresX2, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(colour = location))+
+  scale_fill_discrete()+
+  ggtitle("NMDS Ordination - Samples Across Site")+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "location", y = "NMDS2")
+xxX2
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/NMDS_SP_location_5000.tiff", width = 10, height = 10)
+```
+
+## NMDS Plot Check: PB vs PS vs SB vs SS
+```{r}
+df_meta_5000_SP_BS <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/metadata_5000_SP_BS.csv")
+df_meta_5000_SP_BS
+
+df_otu_5000_SP_BS <-read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/df_otu_5000.csv", row.names=1 )
+df_otu_5000_SP_BS
+
+nmds_asv_otu_SP_BS_5000 <- inner_join(df_meta_5000_SP_BS, df_otu_5000_SP_BS, by="sample_id")
+
+write.table(nmds_asv_otu_SP_BS_5000, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_SP_BS_5000.csv", sep=",", quote=F, col.names=NA)
+```
+
+```{r}
+## All Samples: By Location
+pcX3 <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_SP_BS_5000.csv")
+pcX3
+```
+
+```{r}
+comX3 = pcX3[,4:ncol(pcX3)]
+comX3
+
+m_comX3 <- as.matrix(comX3)
+#m_comX3
+```
+
+```{r}
+set.seed(1000)
+nmdsX3 = metaMDS(m_comX3, distance = "bray")
+
+data.scoresX3 <- as.data.frame(scores(nmdsX3)$sites)
+data.scoresX3$location = pcX3$location
+data.scoresX3$sample_id = pcX3$sample_id
+head(data.scoresX3)
+
+xxX3 = ggplot(data.scoresX3, aes(x = NMDS1, y = NMDS2)) +
+ geom_point(size = 3, aes(colour = location))+
+  scale_fill_discrete()+
+  ggtitle("NMDS Ordination - Samples Across Site")+
+ theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"),
+       axis.text.x = element_text(colour = "black", face = "bold", size = 12),
+       legend.text = element_text(size = 12, face ="bold", colour ="black"),
+       legend.position = "right", axis.title.y = element_text(face = "bold", size = 14),
+       axis.title.x = element_text(face = "bold", size = 14, colour = "black"),
+       legend.title = element_text(size = 14, colour = "black", face = "bold"),
+       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.5),
+       legend.key=element_blank()) +
+ labs(x = "NMDS1", colour = "location", y = "NMDS2")
+xxX3
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/NMDS_SP_BS_location_5000.tiff", width = 10, height = 10)
+```
+
+# ANOSIM: Statistical Test
+```{r}
+#All Samples
+pcQ <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_biofilm_sep_sed_water_5000.csv")
+pcQ
+
+comQ = pcQ[,4:ncol(pcQ)]
+comQ
+
+m_comQ = as.matrix(comQ)
+m_comQ
+
+anoQ = anosim(m_comQ, pcQ$location, distance = "bray", permutations = 9999)
+anoQ
+```
+ANOSIM statistic R: 0.8448 
+      Significance: 1e-04 -> 0.0001
+
+```{r}
+# Star vs Port Biofilm
+pcR <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_SP_5000.csv")
+pcR
+
+comR = pcR[,4:ncol(pcR)]
+comR
+
+m_comR = as.matrix(comR)
+m_comR
+
+anoR = anosim(m_comR, pcR$location, distance = "bray", permutations = 9999)
+anoR
+```
+ANOSIM statistic R: 0.2479 
+      Significance: 9e-04 -> 0.0009
+
+```{r}
+# Star vs Port vs Bow vs Stern Biofilm
+pcT <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/nmds_asv_otu_SP_BS_5000.csv")
+pcT
+
+comT = pcT[,4:ncol(pcT)]
+comT
+
+m_comT = as.matrix(comT)
+m_comT
+
+anoT = anosim(m_comT, pcT$location, distance = "bray", permutations = 9999)
+anoT
+```
+ANOSIM statistic R: 0.04828 
+      Significance: 0.2456 
+
+
+
+
+
+
+
+
+
