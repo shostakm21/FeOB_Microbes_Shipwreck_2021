@@ -1800,7 +1800,185 @@ anoT
 ANOSIM statistic R: 0.04828 
       Significance: 0.2456 
 
+# Ecological Distances Matrices
+## All Samples
+```{r}
+otu_table <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/asv_otu_5000_cutoff.csv", header=T, row.names=1, check.names=FALSE)
+head(otu_table)
 
+otu.table.diver <- t(otu_table)
+otu.table.diver <- as.data.frame(otu.table.diver)
+head(otu.table.diver)
+write.csv(otu.table.diver, "otu.table.diversity.csv")
+```
+
+```{r}
+data(otu.table.diver)
+#Shannon Diversity
+H<-diversity(otu.table.diver)
+H
+
+#Richness
+richness <- specnumber(otu.table.diver)
+
+#Pielou Evenness
+eveness <- H/log(richness)
+
+alpha <- cbind(shannon = H, richness = richness, pielou = eveness, metadata_5000)
+write.csv(alpha, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/diversity_indices_5000.csv")
+head(alpha)
+```
+
+```{r}
+#Shannon Diveristy
+plot.shan <- ggplot(alpha, aes(x = location, y = shannon, colour = location)) +
+geom_boxplot(size = 0.5, outlier.color = "black", outlier.shape = 8, outlier.size = 2) +
+ylab("Shannon's H'") + 
+xlab("") +
+theme_bw() +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.shan
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Shannon_Location_5000.tiff")
+
+# Pielou Evenness
+plot.even <- ggplot(alpha, aes(x = location, y = pielou, colour = location)) +
+geom_boxplot(size = 0.5, outlier.color = "black", outlier.shape = 8, outlier.size = 2) +
+ylab("Pielou's Evenness") +
+xlab("") +
+theme_bw() +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.even
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Pielou's_Evenness_Location_5000.tiff")
+
+# Richness
+plot.rich <-ggplot(alpha, aes(x = location, y = richness, colour = location)) +
+geom_boxplot(size = 0.5, outlier.color = "black", outlier.shape = 8, outlier.size = 2) +
+ylab("Species Richness") +
+xlab("") +
+theme_bw() +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.rich
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Richness_Location_5000.tiff")
+```
+
+```{r}
+# Group Shannon, Richness and Evenness
+legend <- get_legend(plot.even)
+
+plot_grid(plot.shan + theme(legend.position = "none"), plot.rich + theme(legend.position = "none"), plot.even + theme(legend.position = "none"),ncol = 3)
+
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Shannon_Richness_Eveness_5000.tiff")
+```
+
+```{r}
+otu.table.diver.mdf <- as.matrix.data.frame(otu.table.diver)
+rownames(otu.table.diver.mdf) <- metadata_5000$location
+
+otu.table.diver.bray <- vegdist(otu.table.diver.mdf, method="bray")
+otu.table.diver.bray
+```
+
+## Biofilm Only
+```{r}
+otu_table_bio <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/asv_otu_5000_cutoff_biof.csv", header=T, row.names=1, check.names=FALSE)
+head(otu_table_bio)
+
+otu.table.diver.bio <- t(otu_table_bio)
+otu.table.diver.bio <- as.data.frame(otu.table.diver.bio)
+head(otu.table.diver.bio)
+write.csv(otu.table.diver.bio, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/otu.table.diversity.biofilm.csv")
+```
+
+```{r}
+data(otu.table.diver.bio)
+
+#Shannon Diversity
+H<-diversity(otu.table.diver.bio)
+H
+
+#Richness
+richness <- specnumber(otu.table.diver.bio)
+
+#Pielou Evenness
+eveness <- H/log(richness)
+
+metadata_5000_bio <- read.csv("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/metadata_5000_biof.csv")
+metadata_5000_bio
+
+alphaBio <- cbind(shannon = H, richness = richness, pielou = eveness, metadata_5000_bio)
+write.csv(alphaBio, "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/diversity_indices_biofilm.csv")
+head(alphaBio)
+```
+
+```{r}
+#Shannon
+plot.shan.biof <- ggplot(alphaBio, aes(x = location, y = shannon, colour = location)) +
+geom_boxplot(size = 0.5, outlier.color = "black", outlier.shape = 8, outlier.size = 2) +
+ylab("Shannon's H'") + 
+xlab("") +
+theme_bw() +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.shan.biof
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Shannon_Location_5000_biof.tiff")
+
+# Pielou Evenness
+plot.even.biof <- ggplot(alphaBio, aes(x = location, y = pielou, colour = location)) +
+geom_boxplot(size = 0.5, outlier.color = "black", outlier.shape = 8, outlier.size = 2) +
+ylab("Pielou's Evenness") +
+xlab("") +
+theme_bw() +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.even.biof
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Pielou's_Evenness_Location_5000_biof.tiff")
+
+# Richness
+plot.rich.biof <-ggplot(alphaBio, aes(x = location, y = richness, colour = location)) +
+geom_boxplot(size = 0.5, outlier.color = "black", outlier.shape = 8, outlier.size = 2) +
+ylab("Species Richness") +
+xlab("") +
+theme_bw() +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4))
+plot.rich.biof
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Richness_Location_5000_biof.tiff")
+```
+
+```{r}
+# Group Shannon, Richness and Evenness
+legend.biof <- get_legend(plot.even.biof)
+
+plot_grid(plot.shan.biof + theme(legend.position = "none"), plot.rich.biof + theme(legend.position = "none"), plot.even.biof + theme(legend.position = "none"),ncol = 3)
+
+ggsave("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/Shannon_Richness_Eveness_5000_biof.tiff")
+```
+
+
+```{r}
+otu.table.diver.mdf.bio <- as.matrix.data.frame(otu.table.diver.bio)
+rownames(otu.table.diver.mdf.bio) <- metadata_5000_bio$location
+
+otu.table.diver.bray.bio <- vegdist(otu.table.diver.mdf.bio, method="bray")
+otu.table.diver.bray.bio
+```
+
+# Simper: All
+```{r}
+simper <- simper(otu.table.diver, metadata_5000$location, permutations=999)
+options(max.print=999999)
+summary(simper)
+dput(simper, file = "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/simp_location_5000.txt")
+sim <- dget("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/simp_location_5000.txt")
+summary(sim)
+```
+
+## Simper: Biofilm Only
+```{r}}
+simper_biof <- simper(otu.table.diver.bio, metadata_5000_bio$location, permutations=999)
+options(max.print=999999)
+summary(simper_biof)
+dput(simper_biof, file = "/Users/maggieshostak/Desktop/Mallows_5000_cutoff/simp_biof_location_5000.txt")
+sim_biof <- dget("/Users/maggieshostak/Desktop/Mallows_5000_cutoff/simp_biof_location_5000.txt")
+summary(sim_biof)
+```
 
 
 
